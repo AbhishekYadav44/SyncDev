@@ -49,23 +49,13 @@ function deleteRoom(ws) {
         }
     });
 }
-export function initws(server) {
+export async function initws(server) {
     // func call for worker creation
-    initMediasoup();
+    await initMediasoup();
     const wss = new WebSocketServer({ server });
     wss.on('connection', async (socket) => {
         const id = generateId();
         socketIds.set(socket, id);
-        // if (!router) throw new Error("Router not initialized");
-        // ab transport create krna h 
-        // const transport = await router?.createWebRtcTransport({
-        //     listenIps: [{ ip: '0.0.0.0', announcedIp: 'my-public-ip' }],
-        //     enableUdp: true,
-        //     enableTcp: true,
-        //     preferTcp: true
-        // })
-        // console.log(transport)
-        // transportsMap.set(id, transport)
         socket.on('message', async (data) => {
             console.log("data", data.toString());
             let msg = JSON.parse(data.toString());
@@ -132,13 +122,13 @@ export function initws(server) {
             /// connect trnasport for dtls
             if (msg.type === "create-transport") {
                 const sendTransport = await router.createWebRtcTransport({
-                    listenIps: [{ ip: "0.0.0.0", announcedIp: "my-public-ip" }],
+                    listenIps: [{ ip: "0.0.0.0" }],
                     enableUdp: true,
                     enableTcp: true,
                     preferTcp: true
                 });
                 const recvTransport = await router.createWebRtcTransport({
-                    listenIps: [{ ip: "0.0.0.0", announcedIp: "my-public-ip" }],
+                    listenIps: [{ ip: "0.0.0.0" }],
                     enableUdp: true,
                     enableTcp: true,
                     preferTcp: true
@@ -181,13 +171,27 @@ export function initws(server) {
                     kind,
                     rtpParameters ////  rtpParameters → Browser ne send kiye jo actual media ka format, codecs etc. batate hain
                 });
-                // Notify other users in same room
+                // // Notify other users in same room
+                // Rooms.forEach((clients, roomId) => {
+                //     if (clients.has(socket)) {
+                //         clients.forEach((s: WebSocket) => {
+                //             if (s !== socket) {
+                //                 s.send(
+                //                     JSON.stringify({
+                //                         type: 'new-producer',
+                //                         producerId: producer.id
+                //                     })
+                //                 )
+                //             }
+                //         })
+                //     }
+                // })
                 Rooms.forEach((clients, roomId) => {
                     if (clients.has(socket)) {
                         clients.forEach((s) => {
                             if (s !== socket) {
                                 s.send(JSON.stringify({
-                                    type: 'new-producer',
+                                    type: "new-producer",
                                     producerId: producer.id
                                 }));
                             }

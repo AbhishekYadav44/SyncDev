@@ -81,11 +81,11 @@ function deleteRoom(ws: WebSocket) {
 }
 
 
-export function initws(server: http.Server) {
+export async function initws(server: http.Server) {
 
     // func call for worker creation
 
-    initMediasoup()
+    await initMediasoup()
 
 
     const wss = new WebSocketServer({ server })
@@ -96,21 +96,6 @@ export function initws(server: http.Server) {
         const id = generateId();
 
         socketIds.set(socket, id)
-
-
-
-        // if (!router) throw new Error("Router not initialized");
-
-        // ab transport create krna h 
-        // const transport = await router?.createWebRtcTransport({
-        //     listenIps: [{ ip: '0.0.0.0', announcedIp: 'my-public-ip' }],
-        //     enableUdp: true,
-        //     enableTcp: true,
-        //     preferTcp: true
-        // })
-        // console.log(transport)
-        // transportsMap.set(id, transport)
-
 
 
         socket.on('message', async (data) => {
@@ -201,14 +186,14 @@ export function initws(server: http.Server) {
 
             if (msg.type === "create-transport") {
                 const sendTransport = await router!.createWebRtcTransport({
-                    listenIps: [{ ip: "0.0.0.0", announcedIp: "my-public-ip" }],
+                    listenIps: [{ ip: "0.0.0.0" }],
                     enableUdp: true,
                     enableTcp: true,
                     preferTcp: true
                 })
 
                 const recvTransport = await router!.createWebRtcTransport({
-                    listenIps: [{ ip: "0.0.0.0", announcedIp: "my-public-ip" }],
+                    listenIps: [{ ip: "0.0.0.0" }],
                     enableUdp: true,
                     enableTcp: true,
                     preferTcp: true
@@ -234,7 +219,7 @@ export function initws(server: http.Server) {
                 }))
             }
 
- 
+
 
             if (msg.type == 'connect-transport') {
                 const dtlsParameters = msg.dtlsParameters;   // dtls prameter browser send krta h isme fingerprint ya certificate hota h for secr==uirty issue
