@@ -3,9 +3,11 @@ import * as mediasoup from 'mediasoup';
 let worker;
 let router;
 const producersMap = new Map();
-const producerUserMap = new Map(); // FIX: Map producerId -> userId
+const producerUserMap = new Map();
 const sendTransportsMap = new Map();
 const recvTransportsMap = new Map();
+const userRoomsMap = new Map();
+const userReadyMap = new Map();
 const mediaCodecs = [
     {
         kind: "audio",
@@ -54,69 +56,75 @@ export async function initws(server) {
     wss.on('connection', async (socket) => {
         const id = generateId();
         socketIds.set(socket, id);
+        userReadyMap.set(id, { send: false, recv: false });
+        console.log(`\n🟢 User ${id} connected`);
         try {
             socket.on('message', async (data) => {
                 try {
-                    console.log("data", data.toString());
                     let msg = JSON.parse(data.toString());
-                    // JOIN ROOM
+                    // ========== JOIN ROOM ==========
                     if (msg.type === 'join-room') {
                         const roomId = msg.roomId;
-                        console.log("roomId", roomId, "userId", id);
+                        console.log("\n" + "=".repeat(80));
+                        console.log(`👤 User ${id} joining room ${roomId}`);
+                        console.log("=".repeat(80));
                         if (!Rooms.has(roomId)) {
                             Rooms.set(roomId, new Set());
+                            console.log(`🆕 Created new room: ${roomId}`);
                         }
                         const clients = Rooms.get(roomId);
                         clients.add(socket);
-                        console.log("clients size:", clients.size);
-                        // Notify other users that new user joined
-                        clients.forEach((s) => {
+                        userRoomsMap.set(id, roomId);
+                        console.log(`📊 Room ${roomId} now has ${clients.size} clients`);
+                        // Notify existing users
+                        console.log(`\n📢 Step 1: Notifying existing users about ${id}`);
+                        for (const s of clients) {
                             if (s !== socket) {
+                                const existingUserId = socketIds.get(s);
+                                console.log(`  ✉️ Notifying ${existingUserId}`);
                                 s.send(JSON.stringify({
                                     type: 'user-joined',
                                     userId: id
                                 }));
                             }
-                        });
-                        // Send existing producers to new user
-                        const currentRecvTransport = recvTransportsMap.get(id);
-                        if (currentRecvTransport && !currentRecvTransport.closed) {
-                            for (const [otherSocket, otherId] of socketIds) {
-                                if (otherSocket === socket)
-                                    continue;
-                                const userProducers = producersMap.get(otherId);
-                                if (!userProducers || userProducers.length === 0)
-                                    continue;
-                                for (const producer of userProducers) {
-                                    if (!producer.closed && router?.canConsume({
+                        }
+                        // ✅ Send all existing producers to new user
+                        console.log(`\n📬 Step 2: Sending existing producers to ${id}`);
+                        console.log(`   Total users in system: ${socketIds.size}`);
+                        let producersSent = 0;
+                        for (const [otherSocket, otherId] of socketIds) {
+                            console.log(`\n   Checking user: ${otherId}`);
+                            if (otherSocket === socket) {
+                                console.log(`   → Skip (self)`);
+                                continue;
+                            }
+                            const otherRoom = userRoomsMap.get(otherId);
+                            console.log(`   → Room: ${otherRoom} (looking for ${roomId})`);
+                            if (otherRoom !== roomId) {
+                                console.log(`   → Skip (different room)`);
+                                continue;
+                            }
+                            const userProducers = producersMap.get(otherId) || [];
+                            console.log(`   → Has ${userProducers.length} producers`);
+                            for (const producer of userProducers) {
+                                if (!producer.closed) {
+                                    socket.send(JSON.stringify({
+                                        type: 'new-producer',
                                         producerId: producer.id,
-                                        rtpCapabilities: msg.rtpCapabilities
-                                    })) {
-                                        try {
-                                            const consumer = await currentRecvTransport.consume({
-                                                producerId: producer.id,
-                                                rtpCapabilities: msg.rtpCapabilities,
-                                                paused: false
-                                            });
-                                            socket.send(JSON.stringify({
-                                                type: 'consumed',
-                                                producerId: producer.id,
-                                                id: consumer.id,
-                                                kind: consumer.kind,
-                                                rtpParameters: consumer.rtpParameters,
-                                                userId: otherId // FIX: Include userId
-                                            }));
-                                        }
-                                        catch (err) {
-                                            console.error('Failed to consume producer:', err);
-                                        }
-                                    }
+                                        userId: otherId,
+                                        kind: producer.kind
+                                    }));
+                                    producersSent++;
+                                    console.log(`      ✅ Sent ${producer.kind} from ${otherId}`);
                                 }
                             }
                         }
+                        console.log(`\n✅ Total: ${producersSent} producers sent to ${id}`);
+                        console.log("=".repeat(80) + "\n");
                     }
-                    // CREATE TRANSPORT
-                    if (msg.type === "create-transport") {
+                    // ========== CREATE TRANSPORT ==========
+                    else if (msg.type === "create-transport") {
+                        console.log(`🚀 [${id}] Creating transports`);
                         if (!router) {
                             socket.send(JSON.stringify({ type: 'error', message: 'Router not ready' }));
                             return;
@@ -135,6 +143,7 @@ export async function initws(server) {
                         });
                         sendTransportsMap.set(id, sendTransport);
                         recvTransportsMap.set(id, recvTransport);
+                        console.log(`✅ [${id}] Transports created`);
                         socket.send(JSON.stringify({
                             type: "create-transport",
                             sendTransport: {
@@ -151,8 +160,8 @@ export async function initws(server) {
                             }
                         }));
                     }
-                    // CONNECT TRANSPORT
-                    if (msg.type === 'connect-transport') {
+                    // ========== CONNECT TRANSPORT ==========
+                    else if (msg.type === 'connect-transport') {
                         const { dtlsParameters, transportDirection } = msg;
                         const transport = transportDirection === 'send'
                             ? sendTransportsMap.get(id)
@@ -162,10 +171,19 @@ export async function initws(server) {
                             return;
                         }
                         await transport.connect({ dtlsParameters });
+                        const readyStatus = userReadyMap.get(id);
+                        if (transportDirection === 'send') {
+                            readyStatus.send = true;
+                        }
+                        else {
+                            readyStatus.recv = true;
+                        }
+                        userReadyMap.set(id, readyStatus);
+                        console.log(`✅ [${id}] ${transportDirection} transport connected (status: send=${readyStatus.send}, recv=${readyStatus.recv})`);
                         socket.send(JSON.stringify({ type: 'transport-connected' }));
                     }
-                    // PRODUCER
-                    if (msg.type === 'producer') {
+                    // ========== PRODUCER ==========
+                    else if (msg.type === 'producer') {
                         const { kind, rtpParameters } = msg;
                         const sendTransport = sendTransportsMap.get(id);
                         if (!sendTransport || sendTransport.closed) {
@@ -176,36 +194,43 @@ export async function initws(server) {
                             kind,
                             rtpParameters
                         });
-                        // Store producer
                         const userProducers = producersMap.get(id) || [];
                         userProducers.push(producer);
                         producersMap.set(id, userProducers);
-                        // FIX: Map producerId to userId
                         producerUserMap.set(producer.id, id);
-                        // Notify other users in same room
-                        Rooms.forEach((clients, roomId) => {
-                            if (clients.has(socket)) {
-                                clients.forEach((s) => {
-                                    if (s !== socket) {
-                                        s.send(JSON.stringify({
-                                            type: 'new-producer',
-                                            producerId: producer.id,
-                                            userId: id // FIX: Include userId
-                                        }));
-                                    }
-                                });
+                        console.log(`\n🎬 [${id}] Created ${kind} producer`);
+                        const roomId = userRoomsMap.get(id);
+                        if (!roomId)
+                            return;
+                        const clients = Rooms.get(roomId);
+                        if (clients) {
+                            console.log(`📢 Broadcasting to ${clients.size - 1} users:`);
+                            for (const s of clients) {
+                                if (s !== socket) {
+                                    const otherUserId = socketIds.get(s);
+                                    const otherReady = userReadyMap.get(otherUserId);
+                                    console.log(`  👤 ${otherUserId} (recv_ready=${otherReady?.recv})`);
+                                    s.send(JSON.stringify({
+                                        type: 'new-producer',
+                                        producerId: producer.id,
+                                        userId: id,
+                                        kind: kind
+                                    }));
+                                }
                             }
-                        });
+                        }
+                        console.log();
                         socket.send(JSON.stringify({
                             type: 'produced',
                             producerId: producer.id
                         }));
                     }
-                    // CONSUMER
-                    if (msg.type === 'consumer') {
+                    // ========== CONSUMER ==========
+                    else if (msg.type === 'consumer') {
                         const { producerId, rtpCapabilities } = msg;
                         const recvTransport = recvTransportsMap.get(id);
                         if (!recvTransport || recvTransport.closed) {
+                            console.error(`❌ [${id}] No recv transport`);
                             socket.send(JSON.stringify({ type: 'error', message: 'Recv transport not found' }));
                             return;
                         }
@@ -213,26 +238,34 @@ export async function initws(server) {
                             socket.send(JSON.stringify({ type: 'error', message: 'Router not ready' }));
                             return;
                         }
-                        if (router.canConsume({ producerId, rtpCapabilities })) {
+                        console.log(`🍽️ [${id}] Requesting consumer for ${producerId.slice(0, 8)}...`);
+                        if (!router.canConsume({ producerId, rtpCapabilities })) {
+                            console.error(`❌ Cannot consume`);
+                            return;
+                        }
+                        try {
                             const consumer = await recvTransport.consume({
                                 producerId,
                                 rtpCapabilities,
                                 paused: false
                             });
-                            // FIX: Get userId from producerUserMap
                             const userId = producerUserMap.get(producerId);
+                            console.log(`✅ Consumer created from ${userId}`);
                             socket.send(JSON.stringify({
                                 type: 'consumed',
                                 producerId,
                                 id: consumer.id,
                                 kind: consumer.kind,
                                 rtpParameters: consumer.rtpParameters,
-                                userId: userId // FIX: Include userId
+                                userId: userId
                             }));
                         }
+                        catch (err) {
+                            console.error(`❌ Consume failed:`, err);
+                        }
                     }
-                    // CHAT
-                    if (msg.type === 'chat') {
+                    // ========== CHAT ==========
+                    else if (msg.type === 'chat') {
                         const { roomId, message } = msg;
                         const clients = Rooms.get(roomId);
                         clients?.forEach((s) => {
@@ -243,24 +276,22 @@ export async function initws(server) {
                     }
                 }
                 catch (err) {
-                    console.error('Message handling error:', err);
-                    socket.send(JSON.stringify({ type: 'error', message: 'Internal server error' }));
+                    console.error(`❌ [${id}] Error:`, err);
+                    socket.send(JSON.stringify({ type: 'error', message: 'Server error' }));
                 }
             });
             socket.on('close', () => {
-                console.log(`❌ User disconnected: ${id}`);
+                const roomId = userRoomsMap.get(id);
+                console.log(`\n❌ [${id}] Disconnected from ${roomId}`);
                 const sendTransport = sendTransportsMap.get(id);
                 const recvTransport = recvTransportsMap.get(id);
-                if (sendTransport && !sendTransport.closed) {
+                if (sendTransport && !sendTransport.closed)
                     sendTransport.close();
-                }
-                if (recvTransport && !recvTransport.closed) {
+                if (recvTransport && !recvTransport.closed)
                     recvTransport.close();
-                }
                 const userProducers = producersMap.get(id) || [];
                 for (const producer of userProducers) {
                     if (!producer.closed) {
-                        // FIX: Remove from map
                         producerUserMap.delete(producer.id);
                         producer.close();
                     }
@@ -268,21 +299,22 @@ export async function initws(server) {
                 producersMap.delete(id);
                 sendTransportsMap.delete(id);
                 recvTransportsMap.delete(id);
-                // Notify others user left
-                Rooms.forEach((clients, roomId) => {
-                    if (clients.has(socket)) {
-                        clients.delete(socket);
-                        clients.forEach((s) => {
+                userRoomsMap.delete(id);
+                userReadyMap.delete(id);
+                if (roomId) {
+                    const clients = Rooms.get(roomId);
+                    if (clients) {
+                        for (const s of clients) {
                             s.send(JSON.stringify({ type: 'user-left', userId: id }));
-                        });
+                        }
                     }
-                });
+                }
                 deleteRoom(socket);
                 socketIds.delete(socket);
             });
         }
         catch (err) {
-            console.error('Socket error:', err);
+            console.error(`❌ [${id}] Connection error:`, err);
         }
         socket.send(JSON.stringify({
             type: "router-rtp-capabilities",

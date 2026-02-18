@@ -5,10 +5,11 @@ import * as mediasoup from 'mediasoup'
 let worker: mediasoup.types.Worker | undefined
 let router: mediasoup.types.Router | undefined
 const producersMap: Map<string, mediasoup.types.Producer[]> = new Map()
-const producerUserMap: Map<string, string> = new Map() // producerId -> userId
+const producerUserMap: Map<string, string> = new Map()
 const sendTransportsMap: Map<string, mediasoup.types.WebRtcTransport | undefined> = new Map()
 const recvTransportsMap: Map<string, mediasoup.types.WebRtcTransport | undefined> = new Map()
-const userRoomsMap: Map<string, string> = new Map() // userId -> roomId
+const userRoomsMap: Map<string, string> = new Map()
+const userReadyMap: Map<string, { send: boolean; recv: boolean }> = new Map()
 
 const mediaCodecs: mediasoup.types.RtpCodecCapability[] = [
     {
@@ -32,11 +33,8 @@ async function initMediasoup() {
         rtcMinPort: 40000,
         rtcMaxPort: 49999
     })
-
     console.log("✅ mediasoup worker created")
-
     router = await worker.createRouter({ mediaCodecs })
-
     console.log("✅ mediasoup router created")
 }
 
@@ -52,7 +50,6 @@ function deleteRoom(ws: WebSocket) {
         if (clients.has(ws)) {
             clients.delete(ws)
         }
-
         if (clients.size === 0) {
             Rooms.delete(RoomId)
         }
@@ -69,6 +66,7 @@ export async function initws(server: http.Server) {
     wss.on('connection', async (socket) => {
         const id = generateId()
         socketIds.set(socket, id)
+        userReadyMap.set(id, { send: false, recv: false })
 
         console.log(`\n🟢 User ${id} connected`)
 
@@ -80,11 +78,10 @@ export async function initws(server: http.Server) {
                     // ========== JOIN ROOM ==========
                     if (msg.type === 'join-room') {
                         const roomId = msg.roomId
-                        const rtpCapabilities = msg.rtpCapabilities
                         
-                        console.log("\n" + "=".repeat(70))
+                        console.log("\n" + "=".repeat(80))
                         console.log(`👤 User ${id} joining room ${roomId}`)
-                        console.log("=".repeat(70))
+                        console.log("=".repeat(80))
                         
                         if (!Rooms.has(roomId)) {
                             Rooms.set(roomId, new Set<WebSocket>())
@@ -97,10 +94,12 @@ export async function initws(server: http.Server) {
                         
                         console.log(`📊 Room ${roomId} now has ${clients.size} clients`)
 
-                        // ✅ STEP 1: Notify existing users about new user
-                        console.log(`📢 Notifying existing users about new user ${id}`)
+                        // Notify existing users
+                        console.log(`\n📢 Step 1: Notifying existing users about ${id}`)
                         for (const s of clients) {
                             if (s !== socket) {
+                                const existingUserId = socketIds.get(s)
+                                console.log(`  ✉️ Notifying ${existingUserId}`)
                                 s.send(JSON.stringify({ 
                                     type: 'user-joined', 
                                     userId: id 
@@ -108,26 +107,31 @@ export async function initws(server: http.Server) {
                             }
                         }
 
-                        // ✅ STEP 2: Send ALL existing producers to the new user
-                        console.log(`\n🔍 Sending existing producers to new user ${id}...`)
+                        // ✅ Send all existing producers to new user
+                        console.log(`\n📬 Step 2: Sending existing producers to ${id}`)
+                        console.log(`   Total users in system: ${socketIds.size}`)
+                        
+                        let producersSent = 0
                         
                         for (const [otherSocket, otherId] of socketIds) {
-                            // Skip self
-                            if (otherSocket === socket) continue
-
-                            // Only send producers from users in the same room
-                            const otherUserRoom = userRoomsMap.get(otherId)
-                            if (otherUserRoom !== roomId) continue
-
-                            const userProducers = producersMap.get(otherId)
-                            if (!userProducers || userProducers.length === 0) {
-                                console.log(`  ℹ️ User ${otherId} has no producers`)
+                            console.log(`\n   Checking user: ${otherId}`)
+                            
+                            if (otherSocket === socket) {
+                                console.log(`   → Skip (self)`)
+                                continue
+                            }
+                            
+                            const otherRoom = userRoomsMap.get(otherId)
+                            console.log(`   → Room: ${otherRoom} (looking for ${roomId})`)
+                            
+                            if (otherRoom !== roomId) {
+                                console.log(`   → Skip (different room)`)
                                 continue
                             }
 
-                            console.log(`  📬 User ${otherId} has ${userProducers.length} producers`)
+                            const userProducers = producersMap.get(otherId) || []
+                            console.log(`   → Has ${userProducers.length} producers`)
                             
-                            // Send new-producer message for EACH producer
                             for (const producer of userProducers) {
                                 if (!producer.closed) {
                                     socket.send(JSON.stringify({
@@ -136,17 +140,19 @@ export async function initws(server: http.Server) {
                                         userId: otherId,
                                         kind: producer.kind
                                     }))
-                                    console.log(`    ✅ Sent ${producer.kind} producer to new user`)
+                                    producersSent++
+                                    console.log(`      ✅ Sent ${producer.kind} from ${otherId}`)
                                 }
                             }
                         }
                         
-                        console.log("=".repeat(70) + "\n")
+                        console.log(`\n✅ Total: ${producersSent} producers sent to ${id}`)
+                        console.log("=".repeat(80) + "\n")
                     }
 
                     // ========== CREATE TRANSPORT ==========
                     else if (msg.type === "create-transport") {
-                        console.log(`🚀 Creating transports for user ${id}`)
+                        console.log(`🚀 [${id}] Creating transports`)
                         
                         if (!router) {
                             socket.send(JSON.stringify({ type: 'error', message: 'Router not ready' }))
@@ -170,7 +176,7 @@ export async function initws(server: http.Server) {
                         sendTransportsMap.set(id, sendTransport)
                         recvTransportsMap.set(id, recvTransport)
 
-                        console.log(`✅ Transports created for user ${id}`)
+                        console.log(`✅ [${id}] Transports created`)
 
                         socket.send(JSON.stringify({
                             type: "create-transport",
@@ -204,12 +210,19 @@ export async function initws(server: http.Server) {
 
                         await transport.connect({ dtlsParameters })
 
-                        console.log(`✅ ${transportDirection} transport connected for user ${id}`)
+                        const readyStatus = userReadyMap.get(id)!
+                        if (transportDirection === 'send') {
+                            readyStatus.send = true
+                        } else {
+                            readyStatus.recv = true
+                        }
+                        userReadyMap.set(id, readyStatus)
+
+                        console.log(`✅ [${id}] ${transportDirection} transport connected (status: send=${readyStatus.send}, recv=${readyStatus.recv})`)
 
                         socket.send(JSON.stringify({ type: 'transport-connected' }))
                     }
 
-                    // ========== PRODUCER ==========
                     else if (msg.type === 'producer') {
                         const { kind, rtpParameters } = msg
                         const sendTransport = sendTransportsMap.get(id)
@@ -224,25 +237,28 @@ export async function initws(server: http.Server) {
                             rtpParameters
                         })
 
-                        // Store producer
                         const userProducers = producersMap.get(id) || []
                         userProducers.push(producer)
                         producersMap.set(id, userProducers)
                         
-                        // Map producerId to userId
                         producerUserMap.set(producer.id, id)
 
-                        console.log(`🎬 User ${id} created ${kind} producer`)
+                        console.log(`\n[${id}] Created ${kind} producer`)
 
-                        // ✅ FIX: Notify ALL users in the same room (including those who joined later)
-                        const roomId = userRoomsMap.get(id)
+                        const roomId = userRoomsMap.get(id);
+                        if(!roomId)return
                         const clients = Rooms.get(roomId)
                         
                         if (clients) {
-                            console.log(`📢 Broadcasting ${kind} producer to ${clients.size - 1} other users in room ${roomId}`)
+                            console.log(` Broadcasting to ${clients.size - 1} users:`)
                             
                             for (const s of clients) {
                                 if (s !== socket) {
+                                    const otherUserId = socketIds.get(s)
+                                    const otherReady = userReadyMap.get(otherUserId!)
+                                    
+                                    console.log(`  👤 ${otherUserId} (recv_ready=${otherReady?.recv})`)
+                                    
                                     s.send(JSON.stringify({
                                         type: 'new-producer',
                                         producerId: producer.id,
@@ -252,6 +268,8 @@ export async function initws(server: http.Server) {
                                 }
                             }
                         }
+
+                        console.log()
 
                         socket.send(JSON.stringify({
                             type: 'produced',
@@ -265,8 +283,8 @@ export async function initws(server: http.Server) {
                         const recvTransport = recvTransportsMap.get(id)
 
                         if (!recvTransport || recvTransport.closed) {
-                            console.error(`❌ Recv transport not found for user ${id}`)
-                            socket.send(JSON.stringify({ type: 'error', message: 'Recv transport not found or closed' }))
+                            console.error(`❌ [${id}] No recv transport`)
+                            socket.send(JSON.stringify({ type: 'error', message: 'Recv transport not found' }))
                             return
                         }
 
@@ -275,19 +293,23 @@ export async function initws(server: http.Server) {
                             return
                         }
 
-                        console.log(`🍽️ User ${id} requesting consumer for producer ${producerId.slice(0, 8)}...`)
+                        console.log(`🍽️ [${id}] Requesting consumer for ${producerId.slice(0, 8)}...`)
 
-                        if (router.canConsume({ producerId, rtpCapabilities })) {
+                        if (!router.canConsume({ producerId, rtpCapabilities })) {
+                            console.error(`❌ Cannot consume`)
+                            return
+                        }
+
+                        try {
                             const consumer = await recvTransport.consume({
                                 producerId,
                                 rtpCapabilities,
                                 paused: false
                             })
 
-                            // Get userId of the producer
                             const userId = producerUserMap.get(producerId)
 
-                            console.log(`✅ Consumer created for user ${id}`)
+                            console.log(`✅ Consumer created from ${userId}`)
 
                             socket.send(JSON.stringify({
                                 type: 'consumed',
@@ -297,8 +319,8 @@ export async function initws(server: http.Server) {
                                 rtpParameters: consumer.rtpParameters,
                                 userId: userId
                             }))
-                        } else {
-                            console.error(`❌ Router cannot consume producer ${producerId}`)
+                        } catch (err) {
+                            console.error(`❌ Consume failed:`, err)
                         }
                     }
 
@@ -315,25 +337,20 @@ export async function initws(server: http.Server) {
                     }
 
                 } catch (err) {
-                    console.error('❌ Message handling error:', err)
-                    socket.send(JSON.stringify({ type: 'error', message: 'Internal server error' }))
+                    console.error(`❌ [${id}] Error:`, err)
+                    socket.send(JSON.stringify({ type: 'error', message: 'Server error' }))
                 }
             })
 
             socket.on('close', () => {
                 const roomId = userRoomsMap.get(id)
-                console.log(`\n❌ User ${id} disconnected from room ${roomId}`)
+                console.log(`\n❌ [${id}] Disconnected from ${roomId}`)
 
                 const sendTransport = sendTransportsMap.get(id)
                 const recvTransport = recvTransportsMap.get(id)
 
-                if (sendTransport && !sendTransport.closed) {
-                    sendTransport.close()
-                }
-
-                if (recvTransport && !recvTransport.closed) {
-                    recvTransport.close()
-                }
+                if (sendTransport && !sendTransport.closed) sendTransport.close()
+                if (recvTransport && !recvTransport.closed) recvTransport.close()
 
                 const userProducers = producersMap.get(id) || []
                 for (const producer of userProducers) {
@@ -347,12 +364,11 @@ export async function initws(server: http.Server) {
                 sendTransportsMap.delete(id)
                 recvTransportsMap.delete(id)
                 userRoomsMap.delete(id)
+                userReadyMap.delete(id)
 
-                // ✅ Notify all users in the room
                 if (roomId) {
                     const clients = Rooms.get(roomId)
                     if (clients) {
-                        console.log(`📢 Broadcasting user-left to ${clients.size} users in room ${roomId}`)
                         for (const s of clients) {
                             s.send(JSON.stringify({ type: 'user-left', userId: id }))
                         }
@@ -361,15 +377,12 @@ export async function initws(server: http.Server) {
 
                 deleteRoom(socket)
                 socketIds.delete(socket)
-                
-                console.log(`📊 Total users connected: ${socketIds.size}`)
             })
 
         } catch (err) {
-            console.error('❌ Socket connection error:', err)
+            console.error(`❌ [${id}] Connection error:`, err)
         }
 
-        // Send router capabilities when user connects
         socket.send(JSON.stringify({
             type: "router-rtp-capabilities",
             rtpCapabilities: router?.rtpCapabilities
