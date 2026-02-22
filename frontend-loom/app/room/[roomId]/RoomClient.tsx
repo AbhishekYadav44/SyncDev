@@ -39,7 +39,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
             socketRef.current = socket
 
             socket.onopen = () => {
-                console.log('✅ WebSocket connected')
+                console.log(' WebSocket connected')
                 setIsConnected(true)
                 setError(null)
                 reconnectAttemptsRef.current = 0
@@ -50,33 +50,33 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                     const message = JSON.parse(event.data)
 
                     if (message.type === 'error') {
-                        console.error('❌ Server error:', message.message)
+                        console.error(' Server error:', message.message)
                         setError(message.message)
                         return
                     }
 
                     if (message.type === 'router-rtp-capabilities') {
-                        console.log('📡 Loading device...')
-                        
+                        console.log(' Loading device...')
+
                         if (!deviceLoadedRef.current && deviceRef.current) {
                             try {
                                 await deviceRef.current.load({
                                     routerRtpCapabilities: message.rtpCapabilities,
                                 })
                                 deviceLoadedRef.current = true
-                                console.log('✅ Device loaded')
-                                
+                                console.log(' Device loaded')
+
                                 socket.send(JSON.stringify({
                                     type: 'join-room',
                                     roomId,
                                     rtpCapabilities: deviceRef.current.rtpCapabilities,
                                 }))
-                                
+
                                 setTimeout(() => {
                                     socket.send(JSON.stringify({ type: 'create-transport' }))
                                 }, 300)
                             } catch (err) {
-                                console.error('❌ Device load failed:', err)
+                                console.error(' Device load failed:', err)
                                 setError('Device load failed')
                             }
                         }
@@ -84,55 +84,13 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
                     else if (message.type === 'create-transport') {
                         if (!deviceRef.current || !deviceLoadedRef.current) return
-
-                        if (!sendTransportRef.current) {
-                            const sendTransport = deviceRef.current.createSendTransport(message.sendTransport)
-                            sendTransportRef.current = sendTransport
-
-                            sendTransport.on('connect', ({ dtlsParameters }, callback) => {
-                                console.log('📤 Send transport connecting...')
-                                socket.send(JSON.stringify({
-                                    type: 'connect-transport',
-                                    transportDirection: 'send',
-                                    dtlsParameters,
-                                }))
-                                callback()
-                            })
-
-                            sendTransport.on('produce', ({ kind, rtpParameters }, callback) => {
-                                console.log(`🎤 Producing ${kind}...`)
-                                socket.send(JSON.stringify({
-                                    type: 'producer',
-                                    kind,
-                                    rtpParameters,
-                                }))
-
-                                const handler = (event: MessageEvent) => {
-                                    const msg = JSON.parse(event.data)
-                                    if (msg.type === 'produced') {
-                                        console.log(`✅ ${kind} produced`)
-                                        callback({ id: msg.producerId })
-                                        socket.removeEventListener('message', handler)
-                                    }
-                                }
-
-                                socket.addEventListener('message', handler)
-                            })
-
-                            sendTransport.on('connectionstatechange', (state) => {
-                                console.log('📤 Send transport state:', state)
-                            })
-
-                            await startLocalMedia()
-                        }
-
-                        if (!recvTransportRef.current) {
-                            console.log('📥 Creating recv transport...')
+                          if (!recvTransportRef.current) {
+                            console.log(' Creating recv transport...')
                             const recvTransport = deviceRef.current.createRecvTransport(message.recvTransport)
                             recvTransportRef.current = recvTransport
 
                             recvTransport.on('connect', ({ dtlsParameters }, callback) => {
-                                console.log('📥 Recv transport connecting...')
+                                console.log('Recv transport connecting...')
                                 socket.send(JSON.stringify({
                                     type: 'connect-transport',
                                     transportDirection: 'recv',
@@ -142,26 +100,70 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                             })
 
                             recvTransport.on('connectionstatechange', (state) => {
-                                console.log('📥 Recv transport state:', state)
+                                console.log(' Recv transport state:', state)
                             })
                         }
+
+                        if (!sendTransportRef.current) {
+                            const sendTransport = deviceRef.current.createSendTransport(message.sendTransport)
+                            sendTransportRef.current = sendTransport
+
+                            sendTransport.on('connect', ({ dtlsParameters }, callback) => {
+                                console.log('Send transport connecting')
+                                socket.send(JSON.stringify({
+                                    type: 'connect-transport',
+                                    transportDirection: 'send',
+                                    dtlsParameters,
+                                }))
+                                callback()
+                            })
+
+                            sendTransport.on('produce', ({ kind, rtpParameters }, callback) => {
+                                console.log(` Producing ${kind}`)
+                                socket.send(JSON.stringify({
+                                    type: 'producer',
+                                    kind,
+                                    rtpParameters,
+                                }))
+
+                                const handler = (event: MessageEvent) => {
+                                    const msg = JSON.parse(event.data)
+                                    if (msg.type === 'produced') {
+                                        console.log(`${kind} produced`)
+                                        callback({ id: msg.producerId })
+                                        socket.removeEventListener('message', handler)
+                                    }
+                                }
+
+                                socket.addEventListener('message', handler)
+                            })
+
+                            sendTransport.on('connectionstatechange', (state) => {
+                                console.log(' Send transport state:', state)
+                            })
+
+                            await startLocalMedia()
+                        }
+
+                      
                     }
 
                     else if (message.type === 'transport-connected') {
-                        console.log('✅ Transport connected from server')
-                        
-                        // FIX: Mark recv transport as connected
+                        console.log('Transport connected from server')
+                        const recvTransport = recvTransportRef.current;
+                        if (!recvTransport || recvTransport.closed) {
+                            console.log(' Waiting for recv transport to exist...')
+                            return
+                        }
+
                         if (!recvTransportConnectedRef.current) {
                             recvTransportConnectedRef.current = true
-                            console.log('🟢 Recv transport ready!')
+                            console.log(' Recv transport ready!')
 
-                            // Process pending producers
                             const pending = [...pendingProducersRef.current]
                             pendingProducersRef.current = []
 
-                            console.log(`📨 Processing ${pending.length} pending producers`)
                             for (const pendingMsg of pending) {
-                                console.log(`  📨 Requesting consumer for: ${pendingMsg.producerId}`)
                                 socket.send(JSON.stringify({
                                     type: 'consumer',
                                     producerId: pendingMsg.producerId,
@@ -176,12 +178,12 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                         const recvTransport = recvTransportRef.current
 
                         if (!recvTransport) {
-                            console.error('❌ No recv transport')
+                            console.error(' No recv transport')
                             return
                         }
 
                         try {
-                            console.log(`🍽️ Consuming ${kind}...`)
+                            console.log(`Consuming ${kind}...`)
                             const consumer = await recvTransport.consume({
                                 id,
                                 producerId,
@@ -189,14 +191,14 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                                 rtpParameters,
                             })
 
-                            console.log(`✅ Consumed ${kind} from ${userId}`)
+                            console.log(`Consumed ${kind} from ${userId}`)
 
                             let stream = peersRef.current.get(userId)
                             if (!stream) {
                                 stream = new MediaStream()
                                 peersRef.current.set(userId, stream)
                             }
-                            
+
                             stream.addTrack(consumer.track)
 
                             setPeers((prev) => {
@@ -211,39 +213,39 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                             })
 
                         } catch (err) {
-                            console.error('❌ Consume failed:', err)
+                            console.error(' Consume failed:', err)
                         }
                     }
 
                     else if (message.type === 'user-left') {
-                        console.log('❌ User left:', message.userId)
+                        console.log(' User left:', message.userId)
                         peersRef.current.delete(message.userId)
                         setPeers((prev) => prev.filter((p) => p.id !== message.userId))
                     }
 
                     else if (message.type === 'new-producer') {
                         const { producerId, userId } = message
-                        console.log(`🎥 New producer from ${userId}`)
-                        
+                        console.log(`New producer from ${userId}`)
+
                         if (!recvTransportConnectedRef.current) {
-                            console.log(`⏳ Queuing producer (recv not ready)`)
+                            console.log(` Queuing producer (recv not ready)`)
                             pendingProducersRef.current.push(message)
                             return
                         }
 
                         if (!deviceRef.current) {
-                            console.error('❌ No device')
+                            console.error(' No device')
                             return
                         }
 
                         const recvTransport = recvTransportRef.current
                         if (!recvTransport || recvTransport.closed) {
-                            console.error('❌ Recv transport not ready')
+                            console.error(' Recv transport not ready')
                             pendingProducersRef.current.push(message)
                             return
                         }
 
-                        console.log(`📨 Requesting consumer for ${producerId}`)
+                        console.log(`Requesting consumer for ${producerId}`)
                         socket.send(JSON.stringify({
                             type: 'consumer',
                             producerId,
@@ -252,28 +254,28 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                     }
 
                     else if (message.type === 'user-joined') {
-                        console.log('👥 User joined:', message.userId)
+                        console.log(' User joined:', message.userId)
                     }
 
                 } catch (err) {
-                    console.error('❌ Message error:', err)
+                    console.error(' Message error:', err)
                 }
             }
 
             socket.onerror = (err) => {
-                console.error('❌ WebSocket error:', err)
+                console.error(' WebSocket error:', err)
                 setIsConnected(false)
                 setError('WebSocket error')
             }
 
             socket.onclose = () => {
-                console.log('⚠️ WebSocket closed')
+                console.log(' WebSocket closed')
                 setIsConnected(false)
                 attemptReconnect()
             }
 
         } catch (err) {
-            console.error('❌ Connection failed:', err)
+            console.error(' Connection failed:', err)
             setError('Failed to connect')
         }
     }
@@ -282,7 +284,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
         reconnectAttemptsRef.current += 1
         if (reconnectAttemptsRef.current < 5) {
             const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000)
-            console.log(`🔄 Reconnecting in ${delay}ms...`)
+            console.log(` Reconnecting in ${delay}ms...`)
             reconnectTimeoutRef.current = setTimeout(connectWebSocket, delay)
         } else {
             setError('Failed to reconnect after 5 attempts')
@@ -294,9 +296,9 @@ export default function RoomClient({ roomId }: { roomId: string }) {
             setError('No room ID')
             return
         }
-        
+
         connectWebSocket()
-        
+
         return () => {
             if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
             if (socketRef.current?.readyState === WebSocket.OPEN) {
@@ -307,33 +309,33 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
     const startLocalMedia = async () => {
         try {
-            console.log('📷 Requesting media...')
+
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { width: { ideal: 640 }, height: { ideal: 480 } },
                 audio: true,
             })
 
             setLocalStream(stream)
-            console.log('✅ Local media started')
+
 
             const sendTransport = sendTransportRef.current
             if (!sendTransport) {
-                console.error('❌ No send transport')
+                console.error('No send transport')
                 return
             }
 
             for (const track of stream.getTracks()) {
                 try {
-                    console.log(`🎤 Producing ${track.kind}...`)
+                    console.log(` Producing ${track.kind}`)
                     await sendTransport.produce({ track })
                 } catch (err) {
-                    console.error(`❌ Produce failed:`, err)
+                    console.error(` Produce failed:`, err)
                 }
             }
         } catch (err) {
             const msg = err instanceof Error ? err.message : 'Permission denied'
             setError(msg)
-            console.error('❌ Media error:', err)
+            console.error(' Media error:', err)
         }
     }
 
@@ -342,12 +344,12 @@ export default function RoomClient({ roomId }: { roomId: string }) {
             <div className="flex justify-between items-center mb-4">
                 <h1 className="text-2xl font-bold">Room: {roomId}</h1>
                 <div className={`px-3 py-1 rounded ${isConnected ? 'bg-green-600' : 'bg-red-600'}`}>
-                    {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+                    {isConnected ? ' Connected' : ' Disconnected'}
                 </div>
             </div>
 
             <div className="text-sm text-gray-300 mb-4">
-                👥 Participants: {peers.length + 1} (You + {peers.length} others)
+                 Participants: {peers.length + 1} (You + {peers.length} others)
             </div>
 
             {error && (

@@ -182,7 +182,6 @@ export async function initws(server) {
                         console.log(`✅ [${id}] ${transportDirection} transport connected (status: send=${readyStatus.send}, recv=${readyStatus.recv})`);
                         socket.send(JSON.stringify({ type: 'transport-connected' }));
                     }
-                    // ========== PRODUCER ==========
                     else if (msg.type === 'producer') {
                         const { kind, rtpParameters } = msg;
                         const sendTransport = sendTransportsMap.get(id);
@@ -198,13 +197,13 @@ export async function initws(server) {
                         userProducers.push(producer);
                         producersMap.set(id, userProducers);
                         producerUserMap.set(producer.id, id);
-                        console.log(`\n🎬 [${id}] Created ${kind} producer`);
+                        console.log(`\n[${id}] Created ${kind} producer`);
                         const roomId = userRoomsMap.get(id);
                         if (!roomId)
                             return;
                         const clients = Rooms.get(roomId);
                         if (clients) {
-                            console.log(`📢 Broadcasting to ${clients.size - 1} users:`);
+                            console.log(` Broadcasting to ${clients.size - 1} users:`);
                             for (const s of clients) {
                                 if (s !== socket) {
                                     const otherUserId = socketIds.get(s);
