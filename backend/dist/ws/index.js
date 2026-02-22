@@ -29,9 +29,9 @@ async function initMediasoup() {
         rtcMinPort: 40000,
         rtcMaxPort: 49999
     });
-    console.log("✅ mediasoup worker created");
+    console.log(" mediasoup worker created");
     router = await worker.createRouter({ mediaCodecs });
-    console.log("✅ mediasoup router created");
+    console.log(" mediasoup router created");
 }
 let Rooms = new Map();
 let socketIds = new Map();
@@ -57,39 +57,37 @@ export async function initws(server) {
         const id = generateId();
         socketIds.set(socket, id);
         userReadyMap.set(id, { send: false, recv: false });
-        console.log(`\n🟢 User ${id} connected`);
+        console.log(` User ${id} connected`);
         try {
             socket.on('message', async (data) => {
                 try {
                     let msg = JSON.parse(data.toString());
-                    // ========== JOIN ROOM ==========
                     if (msg.type === 'join-room') {
                         const roomId = msg.roomId;
                         console.log("\n" + "=".repeat(80));
-                        console.log(`👤 User ${id} joining room ${roomId}`);
+                        console.log(` User ${id} joining room ${roomId}`);
                         console.log("=".repeat(80));
                         if (!Rooms.has(roomId)) {
                             Rooms.set(roomId, new Set());
-                            console.log(`🆕 Created new room: ${roomId}`);
+                            console.log(` Created new room: ${roomId}`);
                         }
                         const clients = Rooms.get(roomId);
                         clients.add(socket);
                         userRoomsMap.set(id, roomId);
-                        console.log(`📊 Room ${roomId} now has ${clients.size} clients`);
+                        console.log(` Room ${roomId} now has ${clients.size} clients`);
                         // Notify existing users
-                        console.log(`\n📢 Step 1: Notifying existing users about ${id}`);
+                        console.log(`\n Step 1: Notifying existing users about ${id}`);
                         for (const s of clients) {
                             if (s !== socket) {
                                 const existingUserId = socketIds.get(s);
-                                console.log(`  ✉️ Notifying ${existingUserId}`);
+                                console.log(`   Notifying ${existingUserId}`);
                                 s.send(JSON.stringify({
                                     type: 'user-joined',
                                     userId: id
                                 }));
                             }
                         }
-                        // ✅ Send all existing producers to new user
-                        console.log(`\n📬 Step 2: Sending existing producers to ${id}`);
+                        console.log(`\n Step 2: Sending existing producers to ${id}`);
                         console.log(`   Total users in system: ${socketIds.size}`);
                         let producersSent = 0;
                         for (const [otherSocket, otherId] of socketIds) {
@@ -99,13 +97,12 @@ export async function initws(server) {
                                 continue;
                             }
                             const otherRoom = userRoomsMap.get(otherId);
-                            console.log(`   → Room: ${otherRoom} (looking for ${roomId})`);
+                            console.log(` Room: ${otherRoom} (looking for ${roomId})`);
                             if (otherRoom !== roomId) {
-                                console.log(`   → Skip (different room)`);
+                                console.log(` Skip (different room)`);
                                 continue;
                             }
                             const userProducers = producersMap.get(otherId) || [];
-                            console.log(`   → Has ${userProducers.length} producers`);
                             for (const producer of userProducers) {
                                 if (!producer.closed) {
                                     socket.send(JSON.stringify({
@@ -115,16 +112,14 @@ export async function initws(server) {
                                         kind: producer.kind
                                     }));
                                     producersSent++;
-                                    console.log(`      ✅ Sent ${producer.kind} from ${otherId}`);
+                                    console.log(`  Sent ${producer.kind} from ${otherId}`);
                                 }
                             }
                         }
-                        console.log(`\n✅ Total: ${producersSent} producers sent to ${id}`);
-                        console.log("=".repeat(80) + "\n");
+                        console.log(`\nTotal: ${producersSent} producers sent to ${id}`);
                     }
-                    // ========== CREATE TRANSPORT ==========
                     else if (msg.type === "create-transport") {
-                        console.log(`🚀 [${id}] Creating transports`);
+                        console.log(`[${id}] Creating transports`);
                         if (!router) {
                             socket.send(JSON.stringify({ type: 'error', message: 'Router not ready' }));
                             return;
@@ -143,7 +138,6 @@ export async function initws(server) {
                         });
                         sendTransportsMap.set(id, sendTransport);
                         recvTransportsMap.set(id, recvTransport);
-                        console.log(`✅ [${id}] Transports created`);
                         socket.send(JSON.stringify({
                             type: "create-transport",
                             sendTransport: {
@@ -160,7 +154,6 @@ export async function initws(server) {
                             }
                         }));
                     }
-                    // ========== CONNECT TRANSPORT ==========
                     else if (msg.type === 'connect-transport') {
                         const { dtlsParameters, transportDirection } = msg;
                         const transport = transportDirection === 'send'
@@ -179,7 +172,6 @@ export async function initws(server) {
                             readyStatus.recv = true;
                         }
                         userReadyMap.set(id, readyStatus);
-                        console.log(`✅ [${id}] ${transportDirection} transport connected (status: send=${readyStatus.send}, recv=${readyStatus.recv})`);
                         socket.send(JSON.stringify({ type: 'transport-connected' }));
                     }
                     else if (msg.type === 'producer') {
@@ -197,7 +189,6 @@ export async function initws(server) {
                         userProducers.push(producer);
                         producersMap.set(id, userProducers);
                         producerUserMap.set(producer.id, id);
-                        console.log(`\n[${id}] Created ${kind} producer`);
                         const roomId = userRoomsMap.get(id);
                         if (!roomId)
                             return;
@@ -208,7 +199,6 @@ export async function initws(server) {
                                 if (s !== socket) {
                                     const otherUserId = socketIds.get(s);
                                     const otherReady = userReadyMap.get(otherUserId);
-                                    console.log(`  👤 ${otherUserId} (recv_ready=${otherReady?.recv})`);
                                     s.send(JSON.stringify({
                                         type: 'new-producer',
                                         producerId: producer.id,
@@ -224,7 +214,6 @@ export async function initws(server) {
                             producerId: producer.id
                         }));
                     }
-                    // ========== CONSUMER ==========
                     else if (msg.type === 'consumer') {
                         const { producerId, rtpCapabilities } = msg;
                         const recvTransport = recvTransportsMap.get(id);
@@ -237,9 +226,8 @@ export async function initws(server) {
                             socket.send(JSON.stringify({ type: 'error', message: 'Router not ready' }));
                             return;
                         }
-                        console.log(`🍽️ [${id}] Requesting consumer for ${producerId.slice(0, 8)}...`);
                         if (!router.canConsume({ producerId, rtpCapabilities })) {
-                            console.error(`❌ Cannot consume`);
+                            console.error(` Cannot consume`);
                             return;
                         }
                         try {
@@ -249,7 +237,7 @@ export async function initws(server) {
                                 paused: false
                             });
                             const userId = producerUserMap.get(producerId);
-                            console.log(`✅ Consumer created from ${userId}`);
+                            console.log(` Consumer created from ${userId}`);
                             socket.send(JSON.stringify({
                                 type: 'consumed',
                                 producerId,
@@ -260,10 +248,9 @@ export async function initws(server) {
                             }));
                         }
                         catch (err) {
-                            console.error(`❌ Consume failed:`, err);
+                            console.error(`consume failed:`, err);
                         }
                     }
-                    // ========== CHAT ==========
                     else if (msg.type === 'chat') {
                         const { roomId, message } = msg;
                         const clients = Rooms.get(roomId);
@@ -275,13 +262,12 @@ export async function initws(server) {
                     }
                 }
                 catch (err) {
-                    console.error(`❌ [${id}] Error:`, err);
                     socket.send(JSON.stringify({ type: 'error', message: 'Server error' }));
                 }
             });
             socket.on('close', () => {
                 const roomId = userRoomsMap.get(id);
-                console.log(`\n❌ [${id}] Disconnected from ${roomId}`);
+                console.log(` [${id}] Disconnected from ${roomId}`);
                 const sendTransport = sendTransportsMap.get(id);
                 const recvTransport = recvTransportsMap.get(id);
                 if (sendTransport && !sendTransport.closed)
@@ -313,7 +299,7 @@ export async function initws(server) {
             });
         }
         catch (err) {
-            console.error(`❌ [${id}] Connection error:`, err);
+            console.error(`[${id}] Connection error:`, err);
         }
         socket.send(JSON.stringify({
             type: "router-rtp-capabilities",

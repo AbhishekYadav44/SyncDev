@@ -95,7 +95,6 @@ export async function initws(server: http.Server) {
                         console.log(` Room ${roomId} now has ${clients.size} clients`)
 
                         // Notify existing users
-                        console.log(`\n Step 1: Notifying existing users about ${id}`)
                         for (const s of clients) {
                             if (s !== socket) {
                                 const existingUserId = socketIds.get(s)
@@ -117,7 +116,7 @@ export async function initws(server: http.Server) {
                             console.log(`\n   Checking user: ${otherId}`)
                             
                             if (otherSocket === socket) {
-                                console.log(`   → Skip (self)`)
+                               
                                 continue
                             }
                             
@@ -279,7 +278,6 @@ export async function initws(server: http.Server) {
                         const recvTransport = recvTransportsMap.get(id)
 
                         if (!recvTransport || recvTransport.closed) {
-                            console.error(`❌ [${id}] No recv transport`)
                             socket.send(JSON.stringify({ type: 'error', message: 'Recv transport not found' }))
                             return
                         }
