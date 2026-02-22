@@ -33,7 +33,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     const connectWebSocket = () => {
         try {
             const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080'
-            console.log(`🔌 Attempting to connect to ${wsUrl}`)
+           
 
             const socket = new WebSocket(wsUrl)
             socketRef.current = socket
