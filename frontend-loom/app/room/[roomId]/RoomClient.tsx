@@ -24,7 +24,8 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     const [peers, setPeers] = useState<Peer[]>([])
     const [localStream, setLocalStream] = useState<MediaStream | null>(null)
     const [error, setError] = useState<string | null>(null)
-    const [isConnected, setIsConnected] = useState(false)
+    const [isConnected, setIsConnected] = useState(false);
+    const [isMediaReady, setIsMediaReady] = useState(false)
 
     useEffect(() => {
         deviceRef.current = new mediasoupClient.Device()
@@ -33,7 +34,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     const connectWebSocket = () => {
         try {
             const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080'
-           
+
 
             const socket = new WebSocket(wsUrl)
             socketRef.current = socket
@@ -84,7 +85,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
                     else if (message.type === 'create-transport') {
                         if (!deviceRef.current || !deviceLoadedRef.current) return
-                          if (!recvTransportRef.current) {
+                        if (!recvTransportRef.current) {
                             console.log(' Creating recv transport...')
                             const recvTransport = deviceRef.current.createRecvTransport(message.recvTransport)
                             recvTransportRef.current = recvTransport
@@ -145,7 +146,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                             await startLocalMedia()
                         }
 
-                      
+
                     }
 
                     else if (message.type === 'transport-connected') {
@@ -316,6 +317,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
             })
 
             setLocalStream(stream)
+            setIsMediaReady(true)
 
 
             const sendTransport = sendTransportRef.current
@@ -341,53 +343,69 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
     return (
         <div className="min-h-screen bg-black p-6 text-white">
-            <div className="flex justify-between items-center mb-4">
-                <h1 className="text-2xl font-bold">Room: {roomId}</h1>
-                <div className={`px-3 py-1 rounded ${isConnected ? 'bg-green-600' : 'bg-red-600'}`}>
-                    {isConnected ? ' Connected' : ' Disconnected'}
-                </div>
-            </div>
 
-            <div className="text-sm text-gray-300 mb-4">
-                 Participants: {peers.length + 1} (You + {peers.length} others)
-            </div>
-
-            {error && (
-                <div className="bg-red-900 p-4 mb-4 rounded border border-red-700">
-                    <div className="flex justify-between">
-                        <p>{error}</p>
-                        <button onClick={() => setError(null)} className="font-bold">✕</button>
+            {!isMediaReady && (
+                <div className="flex items-center justify-center h-[80vh]">
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-gray-400 text-sm">
+                            Connecting to room...
+                        </p>
                     </div>
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {localStream && (
-                    <div className="relative bg-gray-900 rounded overflow-hidden aspect-video border-2 border-blue-500">
-                        <video
-                            ref={(el) => { if (el) el.srcObject = localStream }}
-                            autoPlay playsInline muted
-                            className="w-full h-full object-cover"
-                        />
-                        <div className="absolute bottom-2 left-2 bg-blue-600 px-2 py-1 rounded text-sm font-bold">
-                            You
+            {isMediaReady && (
+                <>
+                    <div className="flex justify-between items-center mb-4">
+                        <h1 className="text-2xl font-bold">Room: {roomId}</h1>
+                        <div className={`px-3 py-1 rounded ${isConnected ? 'bg-green-600' : 'bg-red-600'}`}>
+                            {isConnected ? ' Connected' : ' Disconnected'}
                         </div>
                     </div>
-                )}
 
-                {peers.map((peer) => (
-                    <div key={peer.id} className="relative bg-gray-900 rounded overflow-hidden aspect-video border-2 border-gray-700">
-                        <video
-                            ref={(el) => { if (el) el.srcObject = peer.stream }}
-                            autoPlay playsInline
-                            className="w-full h-full object-cover"
-                        />
-                        <div className="absolute bottom-2 left-2 bg-gray-700 px-2 py-1 rounded text-sm">
-                            {peer.id.slice(0, 6)}
-                        </div>
+                    <div className="text-sm text-gray-300 mb-4">
+                        Participants: {peers.length + 1} (You + {peers.length} others)
                     </div>
-                ))}
-            </div>
+
+                    {error && (
+                        <div className="bg-red-900 p-4 mb-4 rounded border border-red-700">
+                            <div className="flex justify-between">
+                                <p>{error}</p>
+                                <button onClick={() => setError(null)} className="font-bold">✕</button>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {localStream && (
+                            <div className="relative bg-gray-900 rounded overflow-hidden aspect-video border-2 border-blue-500">
+                                <video
+                                    ref={(el) => { if (el) el.srcObject = localStream }}
+                                    autoPlay playsInline muted
+                                    className="w-full h-full object-cover"
+                                />
+                                <div className="absolute bottom-2 left-2 bg-blue-600 px-2 py-1 rounded text-sm font-bold">
+                                    You
+                                </div>
+                            </div>
+                        )}
+
+                        {peers.map((peer) => (
+                            <div key={peer.id} className="relative bg-gray-900 rounded overflow-hidden aspect-video border-2 border-gray-700">
+                                <video
+                                    ref={(el) => { if (el) el.srcObject = peer.stream }}
+                                    autoPlay playsInline
+                                    className="w-full h-full object-cover"
+                                />
+                                <div className="absolute bottom-2 left-2 bg-gray-700 px-2 py-1 rounded text-sm">
+                                    {peer.id.slice(0, 6)}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
         </div>
     )
 }

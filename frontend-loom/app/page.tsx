@@ -1,6 +1,5 @@
 'use client'
 import React, { useState } from "react";
-import { IconButton } from "@mui/material";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -22,12 +21,14 @@ const item = {
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.6, ease: "easeOut" as const }
+    transition: {
+      duration: 0.6,
+      ease: "easeOut" as const  
+    }
   }
 };
 
 export default function LandingPage() {
-
   const router = useRouter();
   const [joinCode, setJoinCode] = useState("");
 
@@ -62,16 +63,16 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="h-screen w-screen bg-white bg-center text-black font-sans">
+    <div className="min-h-screen w-full bg-white text-black font-sans overflow-x-hidden">
 
-      {/* Navbar */}
+      
       <motion.nav
         initial={{ y: -40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.5 }}
         className="w-full bg-white/80 backdrop-blur-md shadow-sm fixed top-0 left-0 z-50"
       >
-        <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between px-6 py-4 gap-4 md:gap-0">
 
           <div className="flex items-center gap-2 cursor-pointer">
             <div className="h-9 w-9 rounded-xl bg-orange-500 flex items-center justify-center text-white font-bold">
@@ -82,7 +83,7 @@ export default function LandingPage() {
             </h2>
           </div>
 
-          <div className="flex items-center gap-8 text-gray-600 font-medium">
+          <div className="flex flex-col md:flex-row items-center gap-4 md:gap-8 text-gray-600 font-medium">
 
             <div className="relative cursor-pointer group">
               <Link href="/auth/signup">Register</Link>
@@ -111,31 +112,34 @@ export default function LandingPage() {
         variants={container}
         initial="hidden"
         animate="show"
-        className="pt-32 pb-20 px-6"
+        className="pt-28 md:pt-32 pb-16 md:pb-20 px-5 md:px-6"
       >
-        <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
 
-          <motion.div variants={item} className="space-y-6">
-            <h1 className="text-5xl md:text-6xl font-bold leading-tight">
+        
+          <motion.div variants={item} className="space-y-6 text-center md:text-left">
+
+            <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold leading-tight">
               Build. <span className="text-indigo-400">Connect.</span> Deploy Together.
             </h1>
 
-            <p className="text-lg text-gray-500 max-w-lg">
+            <p className="text-base md:text-lg text-gray-500 max-w-lg mx-auto md:mx-0">
               SFU-powered real-time meetings built for developers.
               Low latency. Secure signaling. Seamless collaboration.
             </p>
 
-            <div className="flex gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row gap-4 pt-4 items-center md:items-start">
+
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleNewMeeting}
-                className="bg-orange-500 text-white px-6 py-3 rounded-xl shadow-md hover:bg-orange-600 transition"
+                className="bg-orange-500 text-white px-6 py-3 rounded-xl shadow-md hover:bg-orange-600 transition w-full sm:w-auto"
               >
                 Start Meeting
               </motion.button>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                 <input
                   type="text"
                   placeholder="Enter meeting code"
@@ -144,22 +148,24 @@ export default function LandingPage() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleJoinMeeting();
                   }}
-                  className="px-4 py-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 w-48"
+                  className="px-4 py-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 w-full sm:w-48"
                 />
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handleJoinMeeting}
-                  className="border border-gray-300 px-5 py-3 rounded-md hover:bg-gray-100 transition"
+                  className="border border-gray-300 px-5 py-3 rounded-md hover:bg-gray-100 transition w-full sm:w-auto"
                 >
                   Join
                 </motion.button>
               </div>
+
             </div>
           </motion.div>
 
-          <motion.div variants={item} className="relative">
-            <div className="bg-[#161b22] rounded-3xl shadow-2xl p-6 border border-white/5">
+          <motion.div variants={item} className="relative mt-10 md:mt-0">
+
+            <div className="bg-[#161b22] rounded-3xl shadow-2xl p-5 md:p-6 border border-white/5">
 
               <div className="flex items-center gap-2 mb-4">
                 <div className="h-3 w-3 bg-red-500 rounded-full"></div>
@@ -167,26 +173,26 @@ export default function LandingPage() {
                 <div className="h-3 w-3 bg-green-500 rounded-full"></div>
               </div>
 
-              <div className="bg-[#0d1117] rounded-xl p-4 font-mono text-sm text-green-400 space-y-2 mb-4">
+              <div className="bg-[#0d1117] rounded-xl p-4 font-mono text-xs md:text-sm text-green-400 space-y-2 mb-4 overflow-x-auto">
                 <p>const socket = io("syncdev.io")</p>
                 <p>peerConnection.addTrack(stream)</p>
                 <p>room.join("dev-meet")</p>
               </div>
 
               <div className="space-y-3">
-                <div className="h-32 bg-linear-to-br from-indigo-500/30 to-purple-500/30 rounded-xl flex items-center justify-center text-gray-300">
+                <div className="h-28 md:h-32 bg-linear-to-br from-indigo-500/30 to-purple-500/30 rounded-xl flex items-center justify-center text-gray-300 text-sm md:text-base">
                   Live Video Stream
                 </div>
 
-                <div className="flex gap-3">
-                  <div className="h-14 w-14 bg-[#21262d] rounded-lg"></div>
-                  <div className="h-14 w-14 bg-[#21262d] rounded-lg"></div>
-                  <div className="h-14 w-14 bg-[#21262d] rounded-lg"></div>
+                <div className="flex gap-3 justify-center md:justify-start">
+                  <div className="h-12 w-12 md:h-14 md:w-14 bg-[#21262d] rounded-lg"></div>
+                  <div className="h-12 w-12 md:h-14 md:w-14 bg-[#21262d] rounded-lg"></div>
+                  <div className="h-12 w-12 md:h-14 md:w-14 bg-[#21262d] rounded-lg"></div>
                 </div>
               </div>
             </div>
 
-            <div className="absolute -top-10 -right-10 h-40 w-40 bg-purple-500/20 blur-3xl rounded-full"></div>
+            <div className="absolute -top-6 -right-6 md:-top-10 md:-right-10 h-24 w-24 md:h-40 md:w-40 bg-purple-500/20 blur-3xl rounded-full"></div>
           </motion.div>
 
         </div>
