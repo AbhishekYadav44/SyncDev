@@ -1,10 +1,12 @@
 'use client'
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { BACKEND_URL } from "@/config";
 import { motion } from "framer-motion";
+import { Sledding } from "@mui/icons-material";
+import { Button } from "@mui/material";
 
 const container = {
   hidden: { opacity: 0 },
@@ -23,7 +25,7 @@ const item = {
     y: 0,
     transition: {
       duration: 0.6,
-      ease: "easeOut" as const  
+      ease: "easeOut" as const
     }
   }
 };
@@ -31,12 +33,33 @@ const item = {
 export default function LandingPage() {
   const router = useRouter();
   const [joinCode, setJoinCode] = useState("");
+  const [isLoggedin, setisLoggedin] = useState(false)
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      setisLoggedin(true)
+    } else {
+      setisLoggedin(false)
+    }
+
+  }, [])
+
+  const logouthandler = () => {
+    localStorage.removeItem("token");
+    setisLoggedin(false);
+    router.push("/")
+  }
+
+
 
   const handleNewMeeting = async () => {
     try {
       const token = localStorage.getItem("token");
+
       if (!token) {
         router.push("/auth/signin");
+
         return;
       }
 
@@ -65,7 +88,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen w-full bg-white text-black font-sans overflow-x-hidden">
 
-      
+
       <motion.nav
         initial={{ y: -40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -90,10 +113,24 @@ export default function LandingPage() {
               <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-orange-500 transition-all duration-300 group-hover:w-full"></span>
             </div>
 
-            <div className="relative cursor-pointer group">
-              <Link href="/auth/signin">Login</Link>
-              <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-orange-500 transition-all duration-300 group-hover:w-full"></span>
-            </div>
+            {isLoggedin ? (
+              <div className="relative cursor-pointer group">
+                <button onClick={logouthandler}>
+                  Logout
+                </button>
+                <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-orange-500 transition-all duration-300 group-hover:w-full"></span>
+              </div>
+            ) : (
+              <div className="relative cursor-pointer group">
+                <Link href="/auth/signin">
+                  Login
+                </Link>
+                <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-orange-500 transition-all duration-300 group-hover:w-full"></span>
+              </div>
+            )}
+
+
+
 
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -107,7 +144,7 @@ export default function LandingPage() {
         </div>
       </motion.nav>
 
-    
+
       <motion.section
         variants={container}
         initial="hidden"
@@ -116,7 +153,7 @@ export default function LandingPage() {
       >
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
 
-        
+
           <motion.div variants={item} className="space-y-6 text-center md:text-left">
 
             <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold leading-tight">

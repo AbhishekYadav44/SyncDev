@@ -2,6 +2,9 @@
 
 import * as mediasoupClient from 'mediasoup-client'
 import { useEffect, useRef, useState } from 'react'
+import VideoGrid from '@/app/components/VideoGrid'
+import ControlBar from '@/app/components/ControlBar'
+import { useRouter } from 'next/navigation'
 
 type Peer = {
     id: string
@@ -26,6 +29,15 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     const [error, setError] = useState<string | null>(null)
     const [isConnected, setIsConnected] = useState(false);
     const [isMediaReady, setIsMediaReady] = useState(false)
+
+    const [isMuted, setIsMuted] = useState(false)
+    const [isVideoOff, setIsVideoOff] = useState(false)
+    const [isScreenSharing, setIsScreenSharing] = useState(false)
+
+
+
+     const router = useRouter()
+
 
     useEffect(() => {
         deviceRef.current = new mediasoupClient.Device()
@@ -341,6 +353,78 @@ export default function RoomClient({ roomId }: { roomId: string }) {
         }
     }
 
+
+
+
+
+    const handleMute = async () => {
+        const audioProducer = producersRef.current.get("audio");
+        console.log('btn clicked')
+        console.log(isMuted)
+        if (!audioProducer) return
+        if (audioProducer.paused) {
+            await audioProducer.resume();
+            setIsMuted(false)
+        } else {
+            await audioProducer.pause();
+            setIsMuted(true)
+        }
+    }
+
+
+
+    const handleVideoToggle = async () => {
+        const videoProducre = producersRef.current.get("video");
+        console.log(isVideoOff)
+        if (videoProducre?.paused) {
+            await videoProducre.resume();
+            setIsVideoOff(false)
+        } else {
+            await videoProducre?.pause();
+            setIsVideoOff(true)
+        }
+    }
+
+
+
+    const handleScreenShare = async () => {
+        if (isScreenSharing) {
+
+            const screenProducer = producersRef.current.get("screen")
+            await screenProducer?.close()
+            producersRef.current.delete("screen")
+            setIsScreenSharing(false)
+            return
+        }
+
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+            video: true
+        })
+
+        const track = stream.getVideoTracks()[0]
+        if (!sendTransportRef.current) return
+
+        const producer = await sendTransportRef.current?.produce({
+            track
+        })
+
+        producersRef.current.set("screen", producer)
+        setIsScreenSharing(true)
+    }
+
+
+   
+
+
+    const handleLeave = () => {
+        producersRef.current.forEach(producer => producer.close())
+        socketRef.current?.close()
+        router.push("/")
+    }
+
+
+
+
     return (
         <div className="min-h-screen bg-black p-6 text-white">
 
@@ -377,33 +461,19 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                         </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {localStream && (
-                            <div className="relative bg-gray-900 rounded overflow-hidden aspect-video border-2 border-blue-500">
-                                <video
-                                    ref={(el) => { if (el) el.srcObject = localStream }}
-                                    autoPlay playsInline muted
-                                    className="w-full h-full object-cover"
-                                />
-                                <div className="absolute bottom-2 left-2 bg-blue-600 px-2 py-1 rounded text-sm font-bold">
-                                    You
-                                </div>
-                            </div>
-                        )}
-
-                        {peers.map((peer) => (
-                            <div key={peer.id} className="relative bg-gray-900 rounded overflow-hidden aspect-video border-2 border-gray-700">
-                                <video
-                                    ref={(el) => { if (el) el.srcObject = peer.stream }}
-                                    autoPlay playsInline
-                                    className="w-full h-full object-cover"
-                                />
-                                <div className="absolute bottom-2 left-2 bg-gray-700 px-2 py-1 rounded text-sm">
-                                    {peer.id.slice(0, 6)}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                    <VideoGrid
+                        localStream={localStream}
+                        peers={peers}
+                    />
+                    <ControlBar
+                        isMuted={isMuted}
+                        isVideoOff={isVideoOff}
+                        isScreenSharing={isScreenSharing}
+                        onToggleMute={handleMute}
+                        onToggleVideo={handleVideoToggle}
+                        onToggleScreenShare={handleScreenShare}
+                        onLeave={handleLeave}
+                    />
                 </>
             )}
         </div>
