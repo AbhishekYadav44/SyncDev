@@ -1,3 +1,12 @@
+import {
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  MonitorUp,
+  PhoneOff
+} from "lucide-react"
+
 type Props = {
   isMuted: boolean
   isVideoOff: boolean
@@ -25,39 +34,38 @@ export default function ControlBar({
       <button
         onClick={onToggleMute}
         className={`w-12 h-12 flex items-center justify-center rounded-full 
-        transition-all duration-200 font-semibold
+        transition-all duration-200
         ${isMuted ? 'bg-red-600 hover:bg-red-500' : 'bg-gray-700 hover:bg-gray-600'}`}
       >
-        {isMuted ? '🔇' : '🎤'}
+        {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
       </button>
 
-    
       <button
         onClick={onToggleVideo}
         className={`w-12 h-12 flex items-center justify-center rounded-full 
-        transition-all duration-200 font-semibold
+        transition-all duration-200
         ${isVideoOff ? 'bg-red-600 hover:bg-red-500' : 'bg-gray-700 hover:bg-gray-600'}`}
       >
-        {isVideoOff ? '📷❌' : '📷'}
+        {isVideoOff ? <VideoOff size={20} /> : <Video size={20} />}
       </button>
 
+     
       <button
         onClick={onToggleScreenShare}
         className={`w-12 h-12 flex items-center justify-center rounded-full 
-        transition-all duration-200 font-semibold
+        transition-all duration-200
         ${isScreenSharing ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gray-700 hover:bg-gray-600'}`}
       >
-        🖥
+        <MonitorUp size={20} />
       </button>
 
-      
       <button
         onClick={onLeave}
         className="w-14 h-12 flex items-center justify-center rounded-full 
                    bg-red-700 hover:bg-red-600 transition-all duration-200
-                   text-white font-semibold"
+                   text-white"
       >
-        Leave
+        <PhoneOff size={20} />
       </button>
     </div>
   )
