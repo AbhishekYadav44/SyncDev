@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import VideoGrid from '@/app/components/VideoGrid'
 import ControlBar from '@/app/components/ControlBar'
 import { useRouter } from 'next/navigation'
+import ChatBox from '@/app/components/ChatBox'
 
 type Peer = {
     id: string
@@ -474,6 +475,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                         onToggleScreenShare={handleScreenShare}
                         onLeave={handleLeave}
                     />
+                
                 </>
             )}
         </div>

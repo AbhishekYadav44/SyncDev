@@ -123,13 +123,15 @@ export async function initws(server) {
                             return;
                         }
                         const sendTransport = await router.createWebRtcTransport({
-                            listenIps: [{ ip: "0.0.0.0", announcedIp: "127.0.0.1" }],
+                            //@ts-ignore
+                            listenIps: [{ ip: "0.0.0.0", announcedIp: process.env.ANNOUNCED_IP }],
                             enableUdp: true,
                             enableTcp: true,
                             preferTcp: true
                         });
                         const recvTransport = await router.createWebRtcTransport({
-                            listenIps: [{ ip: "0.0.0.0", announcedIp: "127.0.0.1" }],
+                            //@ts-ignore
+                            listenIps: [{ ip: "0.0.0.0", announcedIp: process.env.ANNOUNCED_IP }],
                             enableUdp: true,
                             enableTcp: true,
                             preferTcp: true
