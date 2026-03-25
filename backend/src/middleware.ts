@@ -9,6 +9,7 @@ export const authMiddleware = (
   next: NextFunction
 ) => {
   const authHeader = req.header("Authorization");
+  const jwt_password = process.env.JWT_PASSWORD ?? ""
 
   if (!authHeader) {
     return res.status(401).json({ message: "token not found" });
@@ -20,6 +21,7 @@ export const authMiddleware = (
 
   try {
     //@ts-ignore
+   
    const decoded = jwt.verify(token, jwt_password) as {id : string};
 
     req.userId = decoded.id; 

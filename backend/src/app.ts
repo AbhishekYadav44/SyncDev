@@ -22,7 +22,7 @@ app.use(cors({
 }));
 
 const dburl = process.env.DB_URL ?? " "
-const jwt_password = process.env.JWT_PASSWORD;
+const jwt_password = process.env.JWT_PASSWORD ?? "";
 
 async function main() {
   await mongoose.connect(dburl)
@@ -117,7 +117,7 @@ app.post("/api/v1/signin", async (req, res) => {
 
     if (isPasswordCorrect) {
 
-      const token = jwt.sign({ id: user.id }, jwt_password!)
+      const token = jwt.sign({ id: user.id }, jwt_password)
       res.json({
         message: "user succesfully logged in ",
         token

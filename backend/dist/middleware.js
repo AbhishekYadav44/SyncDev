@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
-import { jwt_password } from "./config.js";
 export const authMiddleware = (req, res, next) => {
     const authHeader = req.header("Authorization");
+    const jwt_password = process.env.JWT_PASSWORD ?? "";
     if (!authHeader) {
         return res.status(401).json({ message: "token not found" });
     }

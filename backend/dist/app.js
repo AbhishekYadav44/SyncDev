@@ -6,7 +6,6 @@ import z from 'zod';
 import { userModel } from './models/user.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { jwt_password } from './config.js';
 import { authMiddleware } from './middleware.js';
 import { Meeting } from './models/meeting.js';
 import cors from 'cors';
@@ -17,6 +16,7 @@ app.use(cors({
     credentials: true
 }));
 const dburl = process.env.DB_URL ?? " ";
+const jwt_password = process.env.JWT_PASSWORD ?? "";
 async function main() {
     await mongoose.connect(dburl);
 }

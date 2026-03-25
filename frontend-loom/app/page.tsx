@@ -35,7 +35,7 @@ export default function LandingPage() {
   const [joinCode, setJoinCode] = useState("");
   const [isLoggedin, setisLoggedin] = useState(false)
 
-   const BACKEND_URL = "https://devsync-wwmi.onrender.com"
+   
 
   useEffect(() => {
     const token = localStorage.getItem("token");
