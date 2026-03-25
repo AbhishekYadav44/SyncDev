@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
-import { jwt_password } from "./config.js";
+
 
 
 export const authMiddleware = (
@@ -22,9 +22,9 @@ export const authMiddleware = (
     //@ts-ignore
    const decoded = jwt.verify(token, jwt_password) as {id : string};
 
-    req.userId = decoded.id;
+    req.userId = decoded.id; 
     next();
-  } catch {
+  } catch { 
     return res.status(403).json({ message: "Invalid or expired token" });
-  }
+  }  
 };

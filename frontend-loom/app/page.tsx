@@ -44,6 +44,8 @@ export default function LandingPage() {
     } else {
       setisLoggedin(false)
     }
+    console.log(token);
+
 
   }, [])
 
@@ -78,6 +80,8 @@ export default function LandingPage() {
       const roomId = res.data.meetingId;
       router.push(`/room/${roomId}`);
     } catch (err) {
+      //@ts-ignore
+      console.log(err.response?.data);
       console.error("Failed to create meeting", err);
     }
   };
