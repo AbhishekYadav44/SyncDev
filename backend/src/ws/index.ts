@@ -11,6 +11,8 @@ const recvTransportsMap: Map<string, mediasoup.types.WebRtcTransport | undefined
 const userRoomsMap: Map<string, string> = new Map()
 const userReadyMap: Map<string, { send: boolean; recv: boolean }> = new Map()
 
+const consumersMap: Map<string, mediasoup.types.Consumer[]> = new Map()
+
 const mediaCodecs: mediasoup.types.RtpCodecCapability[] = [
     {
         kind: "audio",
@@ -104,7 +106,7 @@ export async function initws(server: http.Server) {
                                     userId: id 
                                 }))
                             }
-                        }
+                        }   
 
                     
                         console.log(`\n Step 2: Sending existing producers to ${id}`)
@@ -165,6 +167,7 @@ export async function initws(server: http.Server) {
                             enableTcp: true,
                             preferTcp: true
                         })
+                        console.log(process.env.ANNOUNCED_IP)
 
                         const recvTransport = await router.createWebRtcTransport({
                             //@ts-ignore
@@ -219,7 +222,7 @@ export async function initws(server: http.Server) {
                         userReadyMap.set(id, readyStatus)
 
 
-                        socket.send(JSON.stringify({ type: 'transport-connected' }))
+                        socket.send(JSON.stringify({ type: 'transport-connected' , direction: transportDirection}))
                     }
 
                     else if (msg.type === 'producer') {
@@ -299,7 +302,7 @@ export async function initws(server: http.Server) {
                             const consumer = await recvTransport.consume({
                                 producerId,
                                 rtpCapabilities,
-                                paused: false
+                                paused: true
                             })
 
                             const userId = producerUserMap.get(producerId)
@@ -314,11 +317,27 @@ export async function initws(server: http.Server) {
                                 rtpParameters: consumer.rtpParameters,
                                 userId: userId
                             }))
+
+                            await consumer.resume();
                         } catch (err) {
                             console.error(`consume failed:`, err)
                         }
                     }
-
+                    
+                    else if(msg.type ==='video-toggle'){
+                        const roomId = userRoomsMap.get(id);
+                        if(!roomId)return
+                        const clients = Rooms.get(roomId);
+                        clients?.forEach((s:WebSocket)=> {
+                            if(s!==socket){
+                                 s.send(JSON.stringify({
+                                    type : 'peer-video-toggle',
+                                    userId :id,
+                                    videoOff : msg.videoOff
+                                 }))
+                            }
+                        })
+                    }
                   
                     else if (msg.type === 'chat') {
                         const { roomId, message } = msg
@@ -366,7 +385,7 @@ export async function initws(server: http.Server) {
                         for (const s of clients) {
                             s.send(JSON.stringify({ type: 'user-left', userId: id }))
                         }
-                    }
+                    }   
                 }
 
                 deleteRoom(socket)
@@ -379,7 +398,7 @@ export async function initws(server: http.Server) {
 
         socket.send(JSON.stringify({
             type: "router-rtp-capabilities",
-            rtpCapabilities: router?.rtpCapabilities
+            rtpCapabilities: router?.rtpCapabilities 
         }))
     })
 }

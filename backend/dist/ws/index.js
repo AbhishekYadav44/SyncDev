@@ -8,6 +8,7 @@ const sendTransportsMap = new Map();
 const recvTransportsMap = new Map();
 const userRoomsMap = new Map();
 const userReadyMap = new Map();
+const consumersMap = new Map();
 const mediaCodecs = [
     {
         kind: "audio",
@@ -129,6 +130,7 @@ export async function initws(server) {
                             enableTcp: true,
                             preferTcp: true
                         });
+                        console.log(process.env.ANNOUNCED_IP);
                         const recvTransport = await router.createWebRtcTransport({
                             //@ts-ignore
                             listenIps: [{ ip: "0.0.0.0", announcedIp: process.env.ANNOUNCED_IP }],
@@ -172,7 +174,7 @@ export async function initws(server) {
                             readyStatus.recv = true;
                         }
                         userReadyMap.set(id, readyStatus);
-                        socket.send(JSON.stringify({ type: 'transport-connected' }));
+                        socket.send(JSON.stringify({ type: 'transport-connected', direction: transportDirection }));
                     }
                     else if (msg.type === 'producer') {
                         const { kind, rtpParameters } = msg;
@@ -233,7 +235,7 @@ export async function initws(server) {
                             const consumer = await recvTransport.consume({
                                 producerId,
                                 rtpCapabilities,
-                                paused: false
+                                paused: true
                             });
                             const userId = producerUserMap.get(producerId);
                             console.log(` Consumer created from ${userId}`);
@@ -245,10 +247,26 @@ export async function initws(server) {
                                 rtpParameters: consumer.rtpParameters,
                                 userId: userId
                             }));
+                            await consumer.resume();
                         }
                         catch (err) {
                             console.error(`consume failed:`, err);
                         }
+                    }
+                    else if (msg.type === 'video-toggle') {
+                        const roomId = userRoomsMap.get(id);
+                        if (!roomId)
+                            return;
+                        const clients = Rooms.get(roomId);
+                        clients?.forEach((s) => {
+                            if (s !== socket) {
+                                s.send(JSON.stringify({
+                                    type: 'peer-video-toggle',
+                                    userId: id,
+                                    videoOff: msg.videoOff
+                                }));
+                            }
+                        });
                     }
                     else if (msg.type === 'chat') {
                         const { roomId, message } = msg;
