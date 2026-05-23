@@ -10,6 +10,7 @@ import ChatBox from '@/app/components/ChatBox'
 type Peer = {
     id: string
     stream: MediaStream
+    videoOff?: boolean
 }
 
 export default function RoomClient({ roomId }: { roomId: string }) {
@@ -37,7 +38,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
 
 
-     const router = useRouter()
+    const router = useRouter()
 
 
     useEffect(() => {
@@ -103,14 +104,27 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                             const recvTransport = deviceRef.current.createRecvTransport(message.recvTransport)
                             recvTransportRef.current = recvTransport
 
-                            recvTransport.on('connect', ({ dtlsParameters }, callback) => {
-                                console.log('Recv transport connecting...')
+                            recvTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
+
+                                const handler = (event: MessageEvent) => {
+                                    const msg = JSON.parse(event.data)
+
+                                    if (
+                                        msg.type === 'transport-connected' &&
+                                        msg.direction === 'recv'
+                                    ) {
+                                        callback()
+                                        socket.removeEventListener('message', handler)
+                                    }
+                                }
+
+                                socket.addEventListener('message', handler)
+
                                 socket.send(JSON.stringify({
                                     type: 'connect-transport',
                                     transportDirection: 'recv',
                                     dtlsParameters,
                                 }))
-                                callback()
                             })
 
                             recvTransport.on('connectionstatechange', (state) => {
@@ -122,14 +136,27 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                             const sendTransport = deviceRef.current.createSendTransport(message.sendTransport)
                             sendTransportRef.current = sendTransport
 
-                            sendTransport.on('connect', ({ dtlsParameters }, callback) => {
-                                console.log('Send transport connecting')
+                            sendTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
+
+                                const handler = (event: MessageEvent) => {
+                                    const msg = JSON.parse(event.data)
+
+                                    if (
+                                        msg.type === 'transport-connected' &&
+                                        msg.direction === 'send'
+                                    ) {
+                                        callback()
+                                        socket.removeEventListener('message', handler)
+                                    }
+                                }
+
+                                socket.addEventListener('message', handler)
+
                                 socket.send(JSON.stringify({
                                     type: 'connect-transport',
                                     transportDirection: 'send',
                                     dtlsParameters,
                                 }))
-                                callback()
                             })
 
                             sendTransport.on('produce', ({ kind, rtpParameters }, callback) => {
@@ -266,6 +293,26 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                             rtpCapabilities: deviceRef.current.rtpCapabilities,
                         }))
                     }
+                    else if (message.type === 'peer-video-toggle') {
+
+                        const { userId, videoOff } = message;
+
+                        console.log("toggle received:", userId, videoOff);
+
+                        setPeers((prev) => {
+
+                            console.log("current peers:", prev);
+
+                            return prev.map((peer) => {
+
+                                console.log("checking peer:", peer.id);
+
+                                return peer.id === userId
+                                    ? { ...peer, videoOff }
+                                    : peer
+                            })
+                        });
+                    }
 
                     else if (message.type === 'user-joined') {
                         console.log(' User joined:', message.userId)
@@ -341,10 +388,16 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
             for (const track of stream.getTracks()) {
                 try {
-                    console.log(` Producing ${track.kind}`)
-                    await sendTransport.produce({ track })
+                    console.log(`Producing ${track.kind}`)
+
+                    const producer = await sendTransport.produce({ track })
+
+                    producersRef.current.set(track.kind, producer)
+
+                    console.log(`${track.kind} producer stored`)
+
                 } catch (err) {
-                    console.error(` Produce failed:`, err)
+                    console.error(`Produce failed:`, err)
                 }
             }
         } catch (err) {
@@ -375,14 +428,38 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
 
     const handleVideoToggle = async () => {
-        const videoProducre = producersRef.current.get("video");
-        console.log(isVideoOff)
-        if (videoProducre?.paused) {
-            await videoProducre.resume();
-            setIsVideoOff(false)
+        const videoProducer = producersRef.current.get("video");
+
+        if (!videoProducer || !localStream) return;
+
+        const videoTrack = localStream.getVideoTracks()[0];
+
+        if (videoProducer.paused) {
+
+            await videoProducer.resume();
+
+            videoTrack.enabled = true;
+
+            socketRef.current?.send(JSON.stringify({
+                type: "video-toggle",
+                videoOff: false
+            }));
+
+            setIsVideoOff(false);
+
         } else {
-            await videoProducre?.pause();
-            setIsVideoOff(true)
+
+            await videoProducer.pause();
+
+            videoTrack.enabled = false;
+
+            socketRef.current?.send(JSON.stringify({
+                type: "video-toggle",
+                videoOff: true
+            }));
+
+            setIsVideoOff(true);
+
         }
     }
 
@@ -414,7 +491,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     }
 
 
-   
+
 
 
     const handleLeave = () => {
@@ -465,6 +542,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                     <VideoGrid
                         localStream={localStream}
                         peers={peers}
+                        isVideoOff={isVideoOff}
                     />
                     <ControlBar
                         isMuted={isMuted}
@@ -475,7 +553,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                         onToggleScreenShare={handleScreenShare}
                         onLeave={handleLeave}
                     />
-                
+
                 </>
             )}
         </div>
