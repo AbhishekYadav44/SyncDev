@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { BACKEND_URL } from "@/config";
 import { motion } from "framer-motion";
 
 const container = {
@@ -67,7 +68,7 @@ export default function LandingPage() {
       }
 
       const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/meeting/create`,
+        `${ process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/meeting/create`,
         {},
         {
           headers: {

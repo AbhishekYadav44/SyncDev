@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import axios from "axios"
 import { motion } from "framer-motion"
 
-
 export default function SignIn() {
   const nameRef = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
@@ -19,7 +18,6 @@ export default function SignIn() {
 
       if (!username || !password) return
       setLoading(true)
-      console.log("url jchkhckcvs : " , process.env.NEXT_PUBLIC_BACKEND_URL)
 
       const res = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/signin`, {
         username,

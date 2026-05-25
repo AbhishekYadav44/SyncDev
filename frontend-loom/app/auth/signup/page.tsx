@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { BACKEND_URL } from "../../../config"
 import { motion } from 'framer-motion'
 
 export default function SignUp() {
