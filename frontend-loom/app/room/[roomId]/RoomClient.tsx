@@ -49,7 +49,12 @@ export default function RoomClient({ roomId }: { roomId: string }) {
         try {
             const wsUrl = process.env.NEXT_PUBLIC_WS_URL!
             console.log(process.env.NEXT_PUBLIC_WS_URL);
-
+            
+            if (!wsUrl) {
+  console.error("WS URL missing in env");
+  return;
+}
+ 
 
             const socket = new WebSocket(wsUrl)
             socketRef.current = socket
