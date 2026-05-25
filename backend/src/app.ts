@@ -17,7 +17,7 @@ const app = express();
 app.use(express.json());
 
 const allowedOrigins = [
-  "http://localhost:3000",
+  
   "https://syncdev-omega.vercel.app"
 ];
 
