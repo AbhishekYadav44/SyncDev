@@ -4,7 +4,7 @@ import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import axios from "axios"
 import { motion } from "framer-motion"
-import { BACKEND_URL } from "@/config"
+
 
 export default function SignIn() {
   const nameRef = useRef<HTMLInputElement>(null)
@@ -19,8 +19,9 @@ export default function SignIn() {
 
       if (!username || !password) return
       setLoading(true)
+      console.log("url jchkhckcvs : " , process.env.NEXT_PUBLIC_BACKEND_URL)
 
-      const res = await axios.post(`${BACKEND_URL}/api/v1/signin`, {
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/signin`, {
         username,
         password
       })
