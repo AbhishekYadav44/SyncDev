@@ -6,6 +6,6 @@ const server = http.createServer(app);
 
 initws(server);
 
-server.listen(8080, "0.0.0.0", () => {
-  console.log("running");
+server.listen(8080, () => {
+  console.log("Server running on port 8080");
 });
