@@ -77,14 +77,14 @@ export async function initws(server: http.Server) {
                 try {
                     let msg = JSON.parse(data.toString())
 
-                    
+
                     if (msg.type === 'join-room') {
                         const roomId = msg.roomId
-                        
+
                         console.log("\n" + "=".repeat(80))
                         console.log(` User ${id} joining room ${roomId}`)
                         console.log("=".repeat(80))
-                        
+
                         if (!Rooms.has(roomId)) {
                             Rooms.set(roomId, new Set<WebSocket>())
                             console.log(` Created new room: ${roomId}`)
@@ -93,7 +93,7 @@ export async function initws(server: http.Server) {
                         const clients = Rooms.get(roomId)!
                         clients.add(socket)
                         userRoomsMap.set(id, roomId)
-                        
+
                         console.log(` Room ${roomId} now has ${clients.size} clients`)
 
                         // Notify existing users
@@ -101,38 +101,38 @@ export async function initws(server: http.Server) {
                             if (s !== socket) {
                                 const existingUserId = socketIds.get(s)
                                 console.log(`   Notifying ${existingUserId}`)
-                                s.send(JSON.stringify({ 
-                                    type: 'user-joined', 
-                                    userId: id 
+                                s.send(JSON.stringify({
+                                    type: 'user-joined',
+                                    userId: id
                                 }))
                             }
-                        }   
+                        }
 
-                    
+
                         console.log(`\n Step 2: Sending existing producers to ${id}`)
                         console.log(`   Total users in system: ${socketIds.size}`)
-                        
+
                         let producersSent = 0
-                        
+
                         for (const [otherSocket, otherId] of socketIds) {
                             console.log(`\n   Checking user: ${otherId}`)
-                            
+
                             if (otherSocket === socket) {
-                               
+
                                 continue
                             }
-                            
+
                             const otherRoom = userRoomsMap.get(otherId)
                             console.log(` Room: ${otherRoom} (looking for ${roomId})`)
-                            
+
                             if (otherRoom !== roomId) {
                                 console.log(` Skip (different room)`)
                                 continue
                             }
 
                             const userProducers = producersMap.get(otherId) || []
-                           
-                            
+
+
                             for (const producer of userProducers) {
                                 if (!producer.closed) {
                                     socket.send(JSON.stringify({
@@ -146,15 +146,15 @@ export async function initws(server: http.Server) {
                                 }
                             }
                         }
-                        
+
                         console.log(`\nTotal: ${producersSent} producers sent to ${id}`)
-                       
+
                     }
 
-                  
+
                     else if (msg.type === "create-transport") {
                         console.log(`[${id}] Creating transports`)
-                        
+
                         if (!router) {
                             socket.send(JSON.stringify({ type: 'error', message: 'Router not ready' }))
                             return
@@ -168,6 +168,10 @@ export async function initws(server: http.Server) {
                             preferTcp: true
                         })
                         console.log(process.env.ANNOUNCED_IP)
+                        console.log("SEND CANDIDATES");
+                        console.log(sendTransport.iceCandidates);
+
+
 
                         const recvTransport = await router.createWebRtcTransport({
                             //@ts-ignore
@@ -176,11 +180,13 @@ export async function initws(server: http.Server) {
                             enableTcp: true,
                             preferTcp: true
                         })
+                        console.log("RECV CANDIDATES");
+                        console.log(recvTransport.iceCandidates);
 
                         sendTransportsMap.set(id, sendTransport)
                         recvTransportsMap.set(id, recvTransport)
 
-                      
+
 
                         socket.send(JSON.stringify({
                             type: "create-transport",
@@ -202,8 +208,8 @@ export async function initws(server: http.Server) {
                     else if (msg.type === 'connect-transport') {
                         const { dtlsParameters, transportDirection } = msg
 
-                        const transport = transportDirection === 'send' 
-                            ? sendTransportsMap.get(id) 
+                        const transport = transportDirection === 'send'
+                            ? sendTransportsMap.get(id)
                             : recvTransportsMap.get(id)
 
                         if (!transport || transport.closed) {
@@ -222,7 +228,7 @@ export async function initws(server: http.Server) {
                         userReadyMap.set(id, readyStatus)
 
 
-                        socket.send(JSON.stringify({ type: 'transport-connected' , direction: transportDirection}))
+                        socket.send(JSON.stringify({ type: 'transport-connected', direction: transportDirection }))
                     }
 
                     else if (msg.type === 'producer') {
@@ -242,24 +248,24 @@ export async function initws(server: http.Server) {
                         const userProducers = producersMap.get(id) || []
                         userProducers.push(producer)
                         producersMap.set(id, userProducers)
-                        
+
                         producerUserMap.set(producer.id, id)
 
-                    
+
 
                         const roomId = userRoomsMap.get(id);
-                        if(!roomId)return
+                        if (!roomId) return
                         const clients = Rooms.get(roomId)
-                        
+
                         if (clients) {
                             console.log(` Broadcasting to ${clients.size - 1} users:`)
-                            
+
                             for (const s of clients) {
                                 if (s !== socket) {
                                     const otherUserId = socketIds.get(s)
                                     const otherReady = userReadyMap.get(otherUserId!)
-                                    
-                                    
+
+
                                     s.send(JSON.stringify({
                                         type: 'new-producer',
                                         producerId: producer.id,
@@ -323,22 +329,22 @@ export async function initws(server: http.Server) {
                             console.error(`consume failed:`, err)
                         }
                     }
-                    
-                    else if(msg.type ==='video-toggle'){
+
+                    else if (msg.type === 'video-toggle') {
                         const roomId = userRoomsMap.get(id);
-                        if(!roomId)return
+                        if (!roomId) return
                         const clients = Rooms.get(roomId);
-                        clients?.forEach((s:WebSocket)=> {
-                            if(s!==socket){
-                                 s.send(JSON.stringify({
-                                    type : 'peer-video-toggle',
-                                    userId :id,
-                                    videoOff : msg.videoOff
-                                 }))
+                        clients?.forEach((s: WebSocket) => {
+                            if (s !== socket) {
+                                s.send(JSON.stringify({
+                                    type: 'peer-video-toggle',
+                                    userId: id,
+                                    videoOff: msg.videoOff
+                                }))
                             }
                         })
                     }
-                  
+
                     else if (msg.type === 'chat') {
                         const { roomId, message } = msg
                         const clients = Rooms.get(roomId)
@@ -385,7 +391,7 @@ export async function initws(server: http.Server) {
                         for (const s of clients) {
                             s.send(JSON.stringify({ type: 'user-left', userId: id }))
                         }
-                    }   
+                    }
                 }
 
                 deleteRoom(socket)
@@ -398,7 +404,7 @@ export async function initws(server: http.Server) {
 
         socket.send(JSON.stringify({
             type: "router-rtp-capabilities",
-            rtpCapabilities: router?.rtpCapabilities 
+            rtpCapabilities: router?.rtpCapabilities
         }))
     })
 }

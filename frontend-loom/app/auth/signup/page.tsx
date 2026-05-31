@@ -2,7 +2,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { BACKEND_URL } from "../../../config"
+
 import { motion } from 'framer-motion'
 
 export default function SignUp() {
@@ -11,6 +11,9 @@ export default function SignUp() {
   const passwordRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false)
   const router = useRouter();
+
+    const BACKEND_URL=process.env.NEXT_PUBLIC_BACKEND_URL
+
 
   const handleRegister = async () => {
     try {
@@ -21,7 +24,7 @@ export default function SignUp() {
       if (!username || !email || !password) return
       setLoading(true)
 
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/signup`, {
+      const res = await axios.post(`${BACKEND_URL}/api/v1/signup`, {
         username,
         email,
         password,

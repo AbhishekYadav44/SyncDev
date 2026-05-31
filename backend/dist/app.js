@@ -12,7 +12,7 @@ import cors from 'cors';
 const app = express();
 app.use(express.json());
 app.use(cors({
-    origin: true,
+    origin: "*",
     credentials: true
 }));
 const dburl = process.env.DB_URL ?? " ";

@@ -131,6 +131,8 @@ export async function initws(server) {
                             preferTcp: true
                         });
                         console.log(process.env.ANNOUNCED_IP);
+                        console.log("SEND CANDIDATES");
+                        console.log(sendTransport.iceCandidates);
                         const recvTransport = await router.createWebRtcTransport({
                             //@ts-ignore
                             listenIps: [{ ip: "0.0.0.0", announcedIp: process.env.ANNOUNCED_IP }],
@@ -138,6 +140,8 @@ export async function initws(server) {
                             enableTcp: true,
                             preferTcp: true
                         });
+                        console.log("RECV CANDIDATES");
+                        console.log(recvTransport.iceCandidates);
                         sendTransportsMap.set(id, sendTransport);
                         recvTransportsMap.set(id, recvTransport);
                         socket.send(JSON.stringify({

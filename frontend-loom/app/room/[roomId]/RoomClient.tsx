@@ -47,14 +47,14 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
     const connectWebSocket = () => {
         try {
-            const wsUrl = process.env.NEXT_PUBLIC_WS_URL!
-            console.log(process.env.NEXT_PUBLIC_WS_URL);
-            
-            if (!wsUrl) {
-  console.error("WS URL missing in env");
-  return;
-}
- 
+            const wsUrl =
+                process.env.NEXT_PUBLIC_WS_URL ??
+                (window.location.hostname === "localhost"
+                    ? "ws://localhost:8080"
+                    : "wss://devsync-wwmi.onrender.com");
+
+            console.log("WS:--------", wsUrl)
+
 
             const socket = new WebSocket(wsUrl)
             socketRef.current = socket
@@ -135,6 +135,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
                             recvTransport.on('connectionstatechange', (state) => {
                                 console.log(' Recv transport state:', state)
+                                 console.log("RECV STATE =>", state)
                             })
                         }
 
@@ -187,6 +188,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
                             sendTransport.on('connectionstatechange', (state) => {
                                 console.log(' Send transport state:', state)
+                                 console.log("SEND STATE =>", state)
                             })
 
                             await startLocalMedia()
