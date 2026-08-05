@@ -141,7 +141,7 @@ export async function initws(server) {
                             preferTcp: true
                         });
                         console.log("RECV CANDIDATES");
-                        console.log(recvTransport.iceCandidates);
+                        console.log("_________", recvTransport.iceCandidates);
                         sendTransportsMap.set(id, sendTransport);
                         recvTransportsMap.set(id, recvTransport);
                         socket.send(JSON.stringify({
