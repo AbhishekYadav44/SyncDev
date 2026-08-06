@@ -162,7 +162,7 @@ export async function initws(server: http.Server) {
 
                         const sendTransport = await router.createWebRtcTransport({
                             //@ts-ignore
-                            listenIps: [{ ip: "0.0.0.0", announcedIp: process.env.ANNOUNCED_IP }],
+                            listenIps: [{ ip: "127.0.0.1" }],
                             enableUdp: true,
                             enableTcp: true,
                             preferTcp: true
@@ -175,13 +175,13 @@ export async function initws(server: http.Server) {
 
                         const recvTransport = await router.createWebRtcTransport({
                             //@ts-ignore
-                            listenIps: [{ ip: "0.0.0.0", announcedIp: process.env.ANNOUNCED_IP }],
+                            listenIps: [{ ip: "127.0.0.1" }],
                             enableUdp: true,
                             enableTcp: true,
                             preferTcp: true
                         })
                         console.log("RECV CANDIDATES");
-                        console.log("_________",recvTransport.iceCandidates);
+                        console.log("_________", recvTransport.iceCandidates);
 
                         sendTransportsMap.set(id, sendTransport)
                         recvTransportsMap.set(id, recvTransport)
@@ -310,6 +310,9 @@ export async function initws(server: http.Server) {
                                 rtpCapabilities,
                                 paused: true
                             })
+                            const userConsumers = consumersMap.get(id) || [];
+                            userConsumers.push(consumer);
+                            consumersMap.set(id, userConsumers);
 
                             const userId = producerUserMap.get(producerId)
 

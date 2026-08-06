@@ -118,6 +118,7 @@ app.post("/api/v1/signin", async (req, res) => {
     if (isPasswordCorrect) {
 
       const token = jwt.sign({ id: user.id }, jwt_password)
+      console.log(token)
       res.json({
         message: "user succesfully logged in ",
         token

@@ -252,6 +252,10 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
                             setPeers((prev) => {
                                 const existing = prev.find(p => p.id === userId)
+                                console.log("Adding stream for:", userId);
+console.log("Tracks:", stream.getTracks());
+console.log("Audio:", stream.getAudioTracks().length);
+console.log("Video:", stream.getVideoTracks().length);
                                 if (existing) {
                                     return prev.map(p =>
                                         p.id === userId ? { ...p, stream: stream! } : p

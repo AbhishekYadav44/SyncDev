@@ -12,7 +12,8 @@ export default function SignIn() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
     const BACKEND_URL=process.env.NEXT_PUBLIC_BACKEND_URL
-
+    console.log("__________________")
+    console.log(BACKEND_URL)
 
   const handleLogin = async () => {
     try {
