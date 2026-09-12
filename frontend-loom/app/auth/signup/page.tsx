@@ -33,7 +33,7 @@ export default function SignUp() {
       console.log(res);
 
       console.log("Success:", res.data);
-      router.push("/");
+      router.push("/signin");
     } catch (err: any) {
       console.error("Error:", err.response?.data?.message || err.message);
 
